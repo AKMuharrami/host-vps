@@ -1,7 +1,7 @@
 {
-  "name": "hostinger-backend",
+  "name": "standalone-backend",
   "version": "1.0.0",
-  "description": "Video processing backend for Hostinger VPS",
+  "description": "GPU accelerated video processing backend",
   "main": "server.ts",
   "scripts": {
     "start": "tsx server.ts",

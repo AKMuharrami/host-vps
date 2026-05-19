@@ -1,41 +1,61 @@
-FROM node:20-slim
+FROM node:20-bookworm
 
-# Install system dependencies for Chromium and FFmpeg with retries
-RUN apt-get update --fix-missing && apt-get install -y --no-install-recommends \
+# Install Chromium and other dependencies for Remotion & FFmpeg
+RUN apt-get update && apt-get install -y \
+    chromium \
     ffmpeg \
-    libnss3 \
-    libatk1.0-0 \
+    fonts-liberation \
+    libasound2 \
     libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libc6 \
+    libcairo2 \
     libcups2 \
-    libdrm2 \
-    libxkbcommon0 \
+    libdbus-1-3 \
+    libexpat1 \
+    libfontconfig1 \
+    libgbm1 \
+    libgcc1 \
+    libglib2.0-0 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libpango-1-0-0 \
+    libpangocairo-1.0-0 \
+    libstdc++6 \
+    libx11-6 \
+    libx11-xcb1 \
+    libxcb1 \
     libxcomposite1 \
+    libxcursor1 \
     libxdamage1 \
     libxext6 \
     libxfixes3 \
+    libxi6 \
     libxrandr2 \
-    libxshmfence1 \
-    libgbm1 \
-    libasound2 \
-    libpangocairo-1.0-0 \
-    libpango-1.0-0 \
-    libcairo2 \
-    fonts-noto-color-emoji \
-    ca-certificates \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    libxrender1 \
+    libxss1 \
+    libxtst6 \
+    lsb-release \
+    wget \
+    xdg-utils \
+    --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-COPY package*.json ./
+# Copy package files
+COPY package.json ./
 RUN npm install
 
+# Copy all the remaining files
 COPY . .
 
-# Set environment variables
-ENV PORT=3005
-ENV NODE_ENV=production
-
+# Build step if necessary (we use tsx so it might not be strictly needed, but let's keep it clean)
 EXPOSE 3005
 
-CMD ["npm", "run", "start:prod"]
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
+# Command to run the backend
+CMD ["npm", "run", "start"]

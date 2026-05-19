@@ -17,6 +17,11 @@ Zip this entire `hostinger-vps` folder and upload it to your VPS.
 ### 2. Setup System
 ```bash
 chmod +x setup-vps.sh && ./setup-vps.sh
+
+# IMPORTANT: Open Firewall Ports
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw reload
 ```
 
 ### 3. Setup Subdomain & SSL (Critical for Vercel)
@@ -27,6 +32,7 @@ Vercel requires HTTPS. You **must** use a subdomain for your rendering server.
 ```bash
 chmod +x setup-ssl.sh && ./setup-ssl.sh
 ```
+*Note: If this fails, make sure nothing is already listening on port 80.*
 
 ### 4. Start the Server
 ```bash
@@ -41,5 +47,17 @@ Once your VPS is running and accessible at `https://api.mumantij-ai.com`:
 3. Redeploy your Vercel app.
 
 ## Troubleshooting
+### Site Can't Be Reached
+1. **Firewall**: Ensure ports 80 and 443 are open (see step 2).
+2. **Container Status**: Check if the containers are running:
+   ```bash
+   docker compose ps
+   ```
+3. **Logs**: If the frontend (Nginx) is not running, it's usually because the SSL certs weren't created correctly. Check logs:
+   ```bash
+   docker compose logs frontend
+   ```
+4. **SSL Files**: Ensure `/hostinger-vps/certs/fullchain.pem` exists before running docker-compose.
+
 ### Health Check
 Visit `https://api.mumantij-ai.com/api/health` to verify the server is running. It should return `{"status":"ok"}`.

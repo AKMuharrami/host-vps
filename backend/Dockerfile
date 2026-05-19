@@ -13,7 +13,8 @@ RUN apt-get update --fix-missing && apt-get install -y --no-install-recommends \
     libxdamage1 \
     libxext6 \
     libxfixes3 \
-    libphi-dev \
+    libxrandr2 \
+    libxshmfence1 \
     libgbm1 \
     libasound2 \
     libpangocairo-1.0-0 \

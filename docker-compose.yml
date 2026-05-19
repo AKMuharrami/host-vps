@@ -5,7 +5,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: mumantij_backend
+    container_name: mumantijai_backend
     restart: always
     ports:
       - "3005:3005"
@@ -18,7 +18,7 @@ services:
 
   frontend:
     image: nginx:alpine
-    container_name: mumantij_frontend
+    container_name: mumantijai_frontend
     restart: always
     ports:
       - "80:80"
@@ -30,4 +30,4 @@ services:
 
 networks:
   default:
-    name: mumantij_network
+    name: mumantijai_network

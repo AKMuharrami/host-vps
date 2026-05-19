@@ -1,7 +1,7 @@
 FROM node:20-slim
 
-# Install system dependencies for Chromium and FFmpeg
-RUN apt-get update && apt-get install -y \
+# Install system dependencies for Chromium and FFmpeg with retries
+RUN apt-get update --fix-missing && apt-get install -y --no-install-recommends \
     ffmpeg \
     libnss3 \
     libatk1.0-0 \
@@ -13,14 +13,15 @@ RUN apt-get update && apt-get install -y \
     libxdamage1 \
     libxext6 \
     libxfixes3 \
-    librandr2 \
+    libphi-dev \
     libgbm1 \
     libasound2 \
     libpangocairo-1.0-0 \
     libpango-1.0-0 \
     libcairo2 \
     fonts-noto-color-emoji \
-    fonts-noto-cjk \
+    ca-certificates \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

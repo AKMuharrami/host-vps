@@ -26,7 +26,10 @@ dotenv.config();
 const app = express();
 const EXPRESS_PORT = process.env.PORT || "3005";
 
-console.log(`[Init] Starting backend on port: ${EXPRESS_PORT}`);
+// Trust proxy for correct IP logging when behind Nginx
+app.set('trust proxy', true);
+
+console.log(`[Init] Starting Hostinger VPS backend on port: ${EXPRESS_PORT}`);
 console.log(`[System] CPU Cores: ${os.cpus().length}`);
 console.log(`[System] Total Memory: ${(os.totalmem() / (1024 * 1024 * 1024)).toFixed(2)} GB`);
 console.log(`[Hardware] GPU Count Mode: ${process.env.GPU_COUNT || 1}`);
@@ -42,18 +45,26 @@ const isProxyMode = !!(process.env.VAST_AI_URL &&
 
 // Debug logging for every request
 app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.url} - IP: ${req.ip}`);
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.url} - Status: ${res.statusCode} - IP: ${req.ip} - ${duration}ms`);
+  });
   next();
 });
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow all origins
+    // Log the origin for debugging
+    if (origin) console.log(`[CORS] Request from origin: ${origin}`);
+    // Allow all origins (for credentials, origin cannot be '*')
     callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'Cache-Control']
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'Cache-Control', 'Range'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  optionsSuccessStatus: 204
 }));
 
 if (isProxyMode) {
@@ -348,7 +359,20 @@ app.get("/api/download-export/:fileId", (req, res) => {
   res.download(filePath, downloadName);
 });
 
-app.post("/api/export-video", upload.single('videoFile'), async (req: any, res: any) => {
+app.post("/api/export-video", (req, res, next) => {
+  console.log(`[Export Pipeline] Starting POST /api/export-video`);
+  console.log(`[Export Pipeline] Content-Type: ${req.headers['content-type']}`);
+  console.log(`[Export Pipeline] Content-Length: ${req.headers['content-length']}`);
+  
+  upload.single('videoFile')(req, res, (err) => {
+    if (err) {
+      console.error(`[Multer Error]`, err);
+      return res.status(400).json({ error: "File upload failed: " + err.message });
+    }
+    console.log(`[Export Pipeline] Multer finished. File: ${req.file ? req.file.filename : 'None'}`);
+    next();
+  });
+}, async (req: any, res: any) => {
   const videoUrl = req.body.videoUrl || '';
   const uploadedFilePath = req.file?.path;
   
@@ -356,9 +380,11 @@ app.post("/api/export-video", upload.single('videoFile'), async (req: any, res: 
   const isAss = String(req.body.isAss) === 'true';
   
   const safeOriginalName = (originalName || 'video.mp4').replace(/[^a-zA-Z0-9._-]/g, '_');
-  console.log(`[Export Pipeline] Received job for: ${safeOriginalName}`);
+  console.log(`[Export Pipeline] Data received: videoUrl=${!!videoUrl}, uploadedFile=${!!uploadedFilePath}, captionsJson=${!!captionsJson}, srtContent=${!!srtContent}`);
+  console.log(`[Export Pipeline] Metadata: name=${safeOriginalName}, resolution=${videoWidth}x${videoHeight}`);
   
   if (!videoUrl && !uploadedFilePath) {
+    console.warn(`[Export Pipeline] Rejecting: No video source provided.`);
     return res.status(400).json({ error: "No video provided." });
   }
   

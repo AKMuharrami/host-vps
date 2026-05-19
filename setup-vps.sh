@@ -3,6 +3,9 @@
 # Update system
 sudo apt-get update && sudo apt-get upgrade -y
 
+# Install prerequisites
+sudo apt-get install -y curl git unzip lsof certbot
+
 # Install Docker
 if ! [ -x "$(command -v docker)" ]; then
     echo "Installing Docker..."
@@ -15,9 +18,10 @@ fi
 sudo apt-get install -y docker-compose-plugin
 
 echo "------------------------------------------------"
-echo "Setup complete!"
-echo "To start the application:"
-echo "1. Build your frontend: npm run build"
-echo "2. Copy 'dist' contents to 'frontend/' folder"
-echo "3. Run: docker compose up -d"
+echo "Basic Setup complete!"
+echo ""
+echo "NEXT STEPS FOR SSL (Mandatory for Vercel):"
+echo "1. Point your subdomain (e.g. render.yourdomain.com) to this VPS IP."
+echo "2. Run: chmod +x setup-ssl.sh && ./setup-ssl.sh"
+echo "3. Finally run: docker compose up -d"
 echo "------------------------------------------------"

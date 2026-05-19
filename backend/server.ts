@@ -309,16 +309,18 @@ let globalCachedBundleLocation: string | null = null;
 let globalBundlePromise: Promise<string> | null = null;
 
 async function processQueue() {
+  console.log(`[Queue] Processing queue. Current size: ${jobQueue.length}, Active jobs: ${activeJobs}/${MAX_CONCURRENT_JOBS}`);
   while (jobQueue.length > 0 && activeJobs < MAX_CONCURRENT_JOBS) {
     const job = jobQueue.shift();
     if (job) {
       activeJobs++;
-      // Run the job asynchronously without blocking the loop
+      console.log(`[Queue] Starting a new job. Active: ${activeJobs}`);
       job()
-        .catch(err => console.error("[Queue] Job failed", err))
+        .then(() => console.log(`[Queue] Job finished successfully. Remaining: ${jobQueue.length}`))
+        .catch(err => console.error("[Queue] Job failed with error:", err))
         .finally(() => {
           activeJobs--;
-          processQueue(); // Prompt the queue to process next item
+          processQueue();
         });
     }
   }

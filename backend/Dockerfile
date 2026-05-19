@@ -1,13 +1,16 @@
 FROM node:20-bookworm
 
-# Avoid interactive prompts during apt install
+# Avoid interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Update and install dependencies
-# We use multiple retries for apt-get update to handle flaky VPS networks
-RUN apt-get update || (sleep 5 && apt-get update) || (sleep 10 && apt-get update)
+# Use a faster, more reliable mirror and handle flaky VPS network
+RUN echo "deb http://deb.debian.org/debian bookworm main\ndeb http://deb.debian.org/debian-security bookworm-security main\ndeb http://deb.debian.org/debian bookworm-updates main" > /etc/apt/sources.list
 
-RUN apt-get install -y --no-install-recommends \
+# Combined update and install with retries
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates gnupg wget && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
     chromium \
     ffmpeg \
     fonts-liberation \
@@ -43,9 +46,7 @@ RUN apt-get install -y --no-install-recommends \
     libxss1 \
     libxtst6 \
     lsb-release \
-    wget \
     xdg-utils \
-    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

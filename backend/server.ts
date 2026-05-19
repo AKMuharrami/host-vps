@@ -547,7 +547,7 @@ app.post("/api/export-video", (req, res, next) => {
             };
 
             const chromiumOptions: any = {
-                gl: 'egl',
+                gl: 'swangle', // Use software rendering for stability in Docker
                 executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 
                               (fs.existsSync('/usr/bin/chromium-browser') ? '/usr/bin/chromium-browser' : '/usr/bin/chromium'),
                 headless: 'new',
@@ -555,12 +555,10 @@ app.post("/api/export-video", (req, res, next) => {
                     "--headless=new",
                     "--no-sandbox", 
                     "--disable-setuid-sandbox", 
-                    "--enable-gpu",
-                    "--enable-webgl",
-                    "--use-gl=egl",
-                    "--enable-accelerated-video-decode",
+                    "--disable-gpu", // Best for VPS without real hardware GPU
+                    "--disable-software-rasterizer",
+                    "--disable-dev-shm-usage", // Uses /tmp instead of /dev/shm (stable for Docker)
                     "--disable-web-security",
-                    "--disable-dev-shm-usage",
                     "--allow-file-access-from-files",
                     "--allow-file-access",
                     "--autoplay-policy=no-user-gesture-required",
@@ -576,7 +574,8 @@ app.post("/api/export-video", (req, res, next) => {
                     "--disable-local-storage",
                     "--disable-session-storage",
                     "--disable-gpu-shader-disk-cache",
-                    "--disk-cache-size=1"
+                    "--disk-cache-size=1",
+                    "--font-render-hinting=none"
                 ]
             };
 
@@ -589,7 +588,7 @@ app.post("/api/export-video", (req, res, next) => {
                 id: 'Captions',
                 inputProps,
                 chromiumOptions,
-                timeoutInMilliseconds: 60000,
+                timeoutInMilliseconds: 120000, // 2 minutes to select composition
                 onBrowserLog: (log) => {
                     if (log.type === 'error' || log.type === 'warning') {
                         console.log(`[Browser] ${log.type}: ${log.text}`);

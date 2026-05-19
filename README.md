@@ -18,7 +18,10 @@ Zip this entire `hostinger-vps` folder and upload it to your VPS.
 ```bash
 chmod +x setup-vps.sh && ./setup-vps.sh
 
-# IMPORTANT: Open Firewall Ports
+# IMPORTANT: If Docker build previously failed, this script 
+# updated your Docker config (MTU/DNS). Restarting system is recommended.
+
+# Open Firewall Ports
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 sudo ufw reload
@@ -36,17 +39,41 @@ chmod +x setup-ssl.sh && ./setup-ssl.sh
 
 ### 4. Start the Server
 ```bash
+# Recommendation: Clear old cache before first build
+docker system prune -a -f
+
+# Build and start
 docker compose up -d --build
 ```
 
-## How to Connect to Vercel
-Once your VPS is running and accessible at `https://api.mumantij-ai.com`:
-
-1. Go to your **Vercel Project Settings** -> **Environment Variables**.
-2. Update `VITE_VPS_BACKEND_URL` to: `https://api.mumantij-ai.com`
-3. Redeploy your Vercel app.
+## Fresh Start (If anything fails)
+If you encounter errors during build or the site is unreachable:
+1. **Clean everything**:
+   ```bash
+   docker compose down
+   docker system prune -a --volumes -f
+   ```
+2. **Re-run setup**:
+   ```bash
+   ./setup-vps.sh
+   ```
+3. **Build again**:
+   ```bash
+   docker compose build --no-cache
+   docker compose up -d
+   ```
 
 ## Troubleshooting
+### Docker Build Fails (apt-get error 100)
+If `docker compose up --build` fails at the `apt-get` step:
+1. **Network Fix applied**: The `setup-vps.sh` script now automatically sets MTU to 1400 and DNS to 8.8.8.8 in `/etc/docker/daemon.json`. This is the most common fix for Hostinger/OVH networking issues in Docker.
+2. **Swap File**: The script also creates a 4GB swap file. Rendering (Chromium) is memory intensive; without swap, the process may be killed by the system (OOM).
+3. **Re-run Setup**: Re-run `./setup-vps.sh` and then **RESTART** your VPS for all network changes to take full effect.
+4. **No Cache**: Try building with no cache:
+   ```bash
+   docker compose build --no-cache
+   ```
+
 ### Site Can't Be Reached
 1. **Firewall**: Ensure ports 80 and 443 are open (see step 2).
 2. **Container Status**: Check if the containers are running:

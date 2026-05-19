@@ -38,8 +38,19 @@ cat <<EOF | sudo tee /etc/docker/daemon.json
 EOF
 sudo systemctl restart docker
 
-# Install Docker Compose
-sudo apt-get install -y docker-compose-plugin
+# Setup Swap File (Critical for low-RAM VPS rendering)
+if [ ! -f /swapfile ]; then
+    echo "Creating 4GB Swap file for stability..."
+    sudo fallocate -l 4G /swapfile
+    sudo chmod 600 /swapfile
+    sudo mkswap /swapfile
+    sudo swapon /swapfile
+    echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+fi
+
+# Create shared storage
+mkdir -p /tmp/mumantij
+chmod 777 /tmp/mumantij
 
 echo "------------------------------------------------"
 echo "Basic Setup complete!"

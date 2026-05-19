@@ -1,7 +1,13 @@
 FROM node:20-bookworm
 
-# Install Chromium and other dependencies for Remotion & FFmpeg
-RUN apt-get update && apt-get install -y \
+# Avoid interactive prompts during apt install
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Update and install dependencies
+# We use multiple retries for apt-get update to handle flaky VPS networks
+RUN apt-get update || (sleep 5 && apt-get update) || (sleep 10 && apt-get update)
+
+RUN apt-get install -y --no-install-recommends \
     chromium \
     ffmpeg \
     fonts-liberation \
@@ -39,19 +45,20 @@ RUN apt-get update && apt-get install -y \
     lsb-release \
     wget \
     xdg-utils \
-    --no-install-recommends && \
-    rm -rf /var/lib/apt/lists/*
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 # Copy package files
 COPY package.json ./
+# Use npm install --prefer-offline to speed up if possible, but mainly ensure it works
 RUN npm install
 
 # Copy all the remaining files
 COPY . .
 
-# Build step if necessary (we use tsx so it might not be strictly needed, but let's keep it clean)
+# Expose the backend port
 EXPOSE 3005
 
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true

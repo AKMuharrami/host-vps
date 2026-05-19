@@ -46,9 +46,10 @@ const isProxyMode = !!(process.env.VAST_AI_URL &&
 // Debug logging for every request
 app.use((req, res, next) => {
   const start = Date.now();
+  console.log(`[Req] ${new Date().toISOString()} - INCOMING: ${req.method} ${req.url} - IP: ${req.ip}`);
   res.on('finish', () => {
     const duration = Date.now() - start;
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.url} - Status: ${res.statusCode} - IP: ${req.ip} - ${duration}ms`);
+    console.log(`[Res] ${new Date().toISOString()} - FINISHED: ${req.method} ${req.url} - Status: ${res.statusCode} - IP: ${req.ip} - ${duration}ms`);
   });
   next();
 });
@@ -56,7 +57,11 @@ app.use((req, res, next) => {
 app.use(cors({
   origin: function (origin, callback) {
     // Log the origin for debugging
-    if (origin) console.log(`[CORS] Request from origin: ${origin}`);
+    if (origin) {
+      console.log(`[CORS] Request from origin: ${origin}`);
+    } else {
+      console.log(`[CORS] Request with no origin Header`);
+    }
     // Allow all origins (for credentials, origin cannot be '*')
     callback(null, true);
   },
@@ -64,7 +69,7 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'Cache-Control', 'Range'],
   exposedHeaders: ['Content-Range', 'X-Content-Range'],
-  optionsSuccessStatus: 204
+  optionsSuccessStatus: 200 // Changed from 204 to 200 for maximum compatibility
 }));
 
 if (isProxyMode) {
@@ -326,12 +331,28 @@ async function processQueue() {
   }
 }
 
-app.get("/api/health", (_req, res) => res.json({ 
-  status: "ok", 
-  version: "1.0.7-gpu-fix",
-  port: EXPRESS_PORT,
-  mode: isProxyMode ? "Middleman Proxy" : "GPU Worker"
-}));
+app.get("/api/health", (_req, res) => {
+  const freeMem = os.freemem() / (1024 * 1024);
+  const totalMem = os.totalmem() / (1024 * 1024);
+  res.json({ 
+    status: "ok", 
+    version: "1.0.8-debug",
+    port: EXPRESS_PORT,
+    mode: isProxyMode ? "Middleman Proxy" : "GPU Worker",
+    system: {
+      freeMemoryMB: freeMem.toFixed(2),
+      totalMemoryMB: totalMem.toFixed(2),
+      cpuCores: os.cpus().length,
+      uptime: os.uptime(),
+      loadAvg: os.loadavg()
+    },
+    queue: {
+      active: activeJobs,
+      pending: jobQueue.length,
+      max: MAX_CONCURRENT_JOBS
+    }
+  });
+});
 
 app.get("/api-status", (_req, res) => {
   res.send(`
@@ -576,10 +597,15 @@ app.post("/api/export-video", (req, res, next) => {
                 }
             });
 
-            const cpuCount = os.cpus().length; // 64 cores
-            const numChunks = durationInFrames > 600 ? 4 : (durationInFrames > 200 ? 2 : 1); 
-            const coresPerJob = Math.floor(cpuCount / Math.max(1, activeJobs));
-            const optimalConcurrency = Math.min(8, Math.max(1, Math.floor(coresPerJob / numChunks)));
+            const cpuCount = os.cpus().length;
+            // On low resource machines (2 cores), we stick to 1 to prevent OOM or CPU starvation
+            const optimalConcurrency = cpuCount <= 2 ? 1 : Math.min(4, Math.max(1, Math.floor(cpuCount / (activeJobs + 1))));
+            
+            // Limit chunks on low resource machines to avoid overhead
+            const durationInFrames = inputProps.durationInFrames;
+            const numChunks = cpuCount <= 2 ? 
+                (durationInFrames > 900 ? 2 : 1) : 
+                (durationInFrames > 600 ? 4 : (durationInFrames > 200 ? 2 : 1));
 
             console.log(`[Export] Starting parallel render. CPU Cores: ${cpuCount}, Active Jobs: ${activeJobs}, Chunks: ${numChunks}, Concurrency per chunk: ${optimalConcurrency}`);
             
@@ -802,6 +828,14 @@ app.get("/api/export-status/:jobId", async (req: any, res: any) => {
    const job = exportJobs.get(jobId);
    if (job) return res.json(job);
    res.status(404).json({ error: "Job not found or expired" });
+});
+
+// Crash handlers
+process.on('uncaughtException', (err) => {
+  console.error('[CRASH] Uncaught Exception:', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[CRASH] Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
 app.listen(Number(EXPRESS_PORT), "0.0.0.0", () => {

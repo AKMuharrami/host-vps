@@ -1,4 +1,4 @@
-FROM node:20-bookworm-slim
+FROM node:20-bookworm
 
 # Avoid interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive
@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
     gnupg \
+    procps \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Remotion & Chrome dependencies

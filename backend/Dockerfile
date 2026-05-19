@@ -1,16 +1,18 @@
-FROM node:20-bookworm
+FROM node:20-bookworm-slim
 
 # Avoid interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Use a faster, more reliable mirror and handle flaky VPS network
-RUN echo "deb http://deb.debian.org/debian bookworm main\ndeb http://deb.debian.org/debian-security bookworm-security main\ndeb http://deb.debian.org/debian bookworm-updates main" > /etc/apt/sources.list
+# Update and install basic tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    gnupg \
+    && rm -rf /var/lib/apt/lists/*
 
-# Combined update and install with retries
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates gnupg wget && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
+# Install Remotion & Chrome dependencies
+# We split this to make it more resilient to network drops
+RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium \
     ffmpeg \
     fonts-liberation \
@@ -53,7 +55,6 @@ WORKDIR /app
 
 # Copy package files
 COPY package.json ./
-# Use npm install --prefer-offline to speed up if possible, but mainly ensure it works
 RUN npm install
 
 # Copy all the remaining files

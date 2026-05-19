@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Configuration
-EMAIL="your-email@example.com" # Change this
-DOMAIN="render.yourdomain.com" # Change this
+EMAIL="akzmuharrami@gmail.com" # Updated with your email
+DOMAIN="api.mumantij-ai.com" # Updated with your subdomain
 
 echo "Setting up SSL for $DOMAIN..."
 

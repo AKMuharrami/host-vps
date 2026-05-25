@@ -6,6 +6,44 @@ const isArabicText = (text: string) => {
   return arabicPattern.test(text);
 };
 
+const scaleStyleValue = (val: string | number | undefined, scale: number): string | number | undefined => {
+    if (val === undefined) return undefined;
+    if (typeof val === 'number') return val * scale;
+    const str = String(val);
+    if (str.endsWith('px')) {
+        const num = parseFloat(str);
+        return `${Math.round(num * scale)}px`;
+    }
+    if (str.endsWith('rem')) {
+        const num = parseFloat(str);
+        return `${num * 16 * scale}px`;
+    }
+    if (str.includes('px')) {
+        return str.replace(/(-?\d+(?:\.\d+)?)px/g, (_, n) => `${Math.round(parseFloat(n) * scale)}px`);
+    }
+    return val;
+};
+
+const scaleStyles = (style: React.CSSProperties | undefined, scale: number): React.CSSProperties => {
+    if (!style) return {};
+    const res: any = {};
+    const keepKeys = new Set([
+        'backgroundColor', 'background', 'color', 'fontWeight', 'textAlign', 
+        'textTransform', 'fontFamily', 'alignItems', 'justifyContent', 
+        'display', 'flexDirection', 'pointerEvents', 'zIndex', 'direction',
+        'lineHeight', 'opacity', 'backdropFilter', 'transformOrigin',
+        'fontStyle', 'borderStyle', 'borderLeftStyle', 'borderRightStyle'
+    ]);
+    for (const [key, val] of Object.entries(style)) {
+        if (keepKeys.has(key)) {
+            res[key] = val;
+        } else {
+            res[key] = scaleStyleValue(val as any, scale);
+        }
+    }
+    return res;
+};
+
 // Map of template styles to inline CSS
 const TITLE_TEMPLATE_STYLES: Record<string, {
     layoutType: string;
@@ -37,14 +75,22 @@ const TITLE_TEMPLATE_STYLES: Record<string, {
     'luxury-serif': {
         layoutType: 'split-cards',
         container: { background: 'linear-gradient(to bottom, #0c0a09, rgba(28, 25, 23, 0.95))', padding: '24px', borderRadius: '16px', border: '1px solid rgba(245, 158, 11, 0.3)', boxShadow: '0 12px 40px rgba(245,158,11,0.12)', textAlign: 'center', maxWidth: '94%', margin: '0 auto' },
-        title: { fontWeight: 900, color: '#fef3c7', textShadow: '0 2px 4px rgba(0,0,0,0.8)', lineHeight: '1.6' },
+        title: { 
+            fontWeight: 900, 
+            fontFamily: 'Janna LT, sans-serif',
+            backgroundImage: 'linear-gradient(to right, #fef3c7, #f59e0b, #fef3c7)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            textShadow: '0 2px 4px rgba(0,0,0,0.5)', 
+            lineHeight: '1.6' 
+        },
         subtitle: { fontWeight: 500, color: '#e7e5e4', letterSpacing: '0.05em', textTransform: 'uppercase', lineHeight: '1' },
-        subtitleContainer: { backgroundColor: 'rgba(69, 26, 3, 0.4)', border: '1px solid rgba(245, 158, 11, 0.2)', padding: '6px 12px', borderRadius: '8px', backdropFilter: 'blur(4px)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'inline-block' }
+        subtitleContainer: { fontFamily: 'Janna LT, sans-serif', backgroundColor: 'rgba(69, 26, 3, 0.4)', border: '1px solid rgba(245, 158, 11, 0.2)', padding: '6px 12px', borderRadius: '8px', backdropFilter: 'blur(4px)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'inline-block' }
     },
     'fuji-modern': {
         layoutType: 'split-cards',
         container: { backgroundColor: 'rgba(30, 27, 75, 0.45)', backdropFilter: 'blur(20px)', border: '1px solid rgba(129, 140, 248, 0.2)', padding: '20px', borderRadius: '16px', boxShadow: '0 8px 32px rgba(99,102,241,0.15)', textAlign: 'center', maxWidth: '92%', margin: '0 auto' },
-        title: { fontWeight: 800, color: 'white', letterSpacing: '0.05em', lineHeight: '1.2', textShadow: '0 2px 10px rgba(0,0,0,0.5)' },
+        title: { fontWeight: 800, color: 'white', letterSpacing: '0.05em', textTransform: 'uppercase', lineHeight: '1.2', textShadow: '0 2px 10px rgba(0,0,0,0.5)' },
         subtitle: { fontWeight: 500, color: '#c7d2fe', lineHeight: '1' },
         subtitleContainer: { backgroundColor: 'rgba(217, 70, 239, 0.2)', border: '1px solid rgba(232, 121, 249, 0.2)', padding: '6px 14px', borderRadius: '9999px', display: 'inline-block', backdropFilter: 'blur(8px)', boxShadow: '0 5px 15px rgba(240,70,170,0.15)' }
     },
@@ -168,8 +214,8 @@ export const CaptionsComposition = ({
     const coverFontRaw = styleOptions.coverFontFamily || 'template-default';
     const coverFont = coverFontRaw !== 'template-default'
         ? (FONT_MAP[styleOptions.coverFontFamily] || styleOptions.coverFontFamily || 'Janna LT')
-        : baseFont;
-    const resolvedCoverFont = `${coverFont}, sans-serif`;
+        : undefined;
+    const resolvedCoverFont = coverFont ? `${coverFont}, sans-serif` : undefined;
 
     useEffect(() => {
         if (!styleOptions.fontFamily) {
@@ -469,6 +515,21 @@ export const CaptionsComposition = ({
                             const scaledTitleFontSize = Math.floor(baseTitleSize * scaleRatio * titleFontSizeMultiplier);
                             const scaledSubtitleFontSize = Math.floor(10 * scaleRatio);
                             
+                            const scaledContainer = scaleStyles(template.container, scaleRatio);
+                            const scaledTitle = scaleStyles(template.title, scaleRatio);
+                            const scaledSubtitle = scaleStyles(template.subtitle, scaleRatio);
+                            const scaledSubtitleContainer = template.subtitleContainer 
+                                ? scaleStyles(template.subtitleContainer, scaleRatio) 
+                                : {
+                                    backgroundColor: 'rgba(17, 17, 21, 0.95)',
+                                    border: `${Math.round(1 * scaleRatio)}px solid rgba(255, 255, 255, 0.1)`,
+                                    padding: `${6 * scaleRatio}px ${14 * scaleRatio}px`,
+                                    borderRadius: `${9999 * scaleRatio}px`,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                };
+
                             const customStyles: React.CSSProperties = {
                                 fontFamily: resolvedCoverFont,
                                 lineHeight: '1.4',
@@ -479,90 +540,82 @@ export const CaptionsComposition = ({
                                 margin: 0
                             };
                             
-                            const mergedTitleStyle = { ...template.title, ...customStyles };
+                            const mergedTitleStyle = { ...scaledTitle, ...customStyles };
                             
                             if (tmplId === 'retro-synthwave') {
                                 mergedTitleStyle.backgroundImage = 'linear-gradient(to right, #facc15, #ec4899, #22d3ee)';
                                 mergedTitleStyle.WebkitBackgroundClip = 'text';
                                 (mergedTitleStyle as any).WebkitTextFillColor = 'transparent';
-                            }
-                            
-                            const titleEl = (
-                                <h2 style={mergedTitleStyle}>
-                                    {styleOptions?.coverTitle || ''}
-                                </h2>
-                            );
-                            
-                            const subtitleEl = styleOptions?.coverSubtitle ? (
-                                <p style={{
-                                    ...template.subtitle,
-                                    fontFamily: resolvedCoverFont,
-                                    lineHeight: '1.3',
-                                    fontSize: `${scaledSubtitleFontSize}px`,
-                                    direction: isArabicSub ? 'rtl' : 'ltr',
-                                    margin: 0
-                                }}>
-                                    {styleOptions?.coverSubtitle}
-                                </p>
-                            ) : null;
-                            
-                            if (layoutType === 'no-box') {
-                                return (
-                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: '4px', maxWidth: '95%', margin: '0 auto', padding: '8px 0' }}>
-                                        <div>
-                                            {titleEl}
-                                        </div>
-                                        {subtitleEl && (
-                                            <div style={{
-                                                transform: `scale(${subtitleSizeMultiplier})`,
-                                                transformOrigin: 'center top',
-                                                marginTop: '2px',
-                                                opacity: 0.95
-                                            }}>
-                                                {subtitleEl}
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            }
-                            
-                            return (
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', width: '100%', maxWidth: '95%', margin: '0 auto' }}>
-                                    <div style={{
-                                        ...template.container,
-                                        paddingTop: `${titleBgHeightMultiplier * 1.25}rem`,
-                                        paddingBottom: `${titleBgHeightMultiplier * 1.25}rem`,
-                                    }}>
-                                        {tmplId === 'podcast-ribbon' && (
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '8px', position: 'relative' }}>
-                                                <span style={{ width: '8px', height: '8px', backgroundColor: '#dc2626', borderRadius: '50%', display: 'inline-block' }} />
-                                                <span style={{ fontSize: '10px', fontWeight: 900, color: '#fca5a5', letterSpacing: '0.1em' }}>
-                                                    🔴 LIVE ON AIR
-                                                </span>
-                                            </div>
-                                        )}
-                                        {titleEl}
-                                    </div>
-                                    {subtitleEl && (
-                                        <div style={{
-                                            ...(template.subtitleContainer || {
-                                                backgroundColor: 'rgba(17, 17, 21, 0.95)',
-                                                border: '1px solid rgba(255, 255, 255, 0.1)',
-                                                padding: '6px 14px',
-                                                borderRadius: '9999px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center'
-                                            }),
-                                            transform: `scale(${subtitleSizeMultiplier * 0.95})`,
-                                            transformOrigin: 'center top',
-                                            marginTop: '2px'
-                                        }}>
-                                            {subtitleEl}
-                                        </div>
-                                    )}
-                                </div>
-                            );
+                             }
+                             
+                             const titleEl = (
+                                 <h2 style={mergedTitleStyle}>
+                                     {styleOptions?.coverTitle || ''}
+                                 </h2>
+                             );
+                             
+                             const subtitleEl = styleOptions?.coverSubtitle ? (
+                                 <p style={{
+                                     ...scaledSubtitle,
+                                     fontFamily: resolvedCoverFont,
+                                     lineHeight: '1.3',
+                                     fontSize: `${scaledSubtitleFontSize}px`,
+                                     direction: isArabicSub ? 'rtl' : 'ltr',
+                                     margin: 0
+                                 }}>
+                                     {styleOptions?.coverSubtitle}
+                                 </p>
+                             ) : null;
+                             
+                             if (layoutType === 'no-box') {
+                                 return (
+                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: `${4 * scaleRatio}px`, maxWidth: '95%', margin: '0 auto', padding: `${8 * scaleRatio}px 0` }}>
+                                         <div>
+                                             {titleEl}
+                                         </div>
+                                         {subtitleEl && (
+                                             <div style={{
+                                                 transform: `scale(${subtitleSizeMultiplier})`,
+                                                 transformOrigin: 'center top',
+                                                 marginTop: `${2 * scaleRatio}px`,
+                                                 opacity: 0.95
+                                             }}>
+                                                 {subtitleEl}
+                                             </div>
+                                         )}
+                                     </div>
+                                 );
+                             }
+                             
+                             return (
+                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: `${4 * scaleRatio}px`, width: '100%', maxWidth: '95%', margin: '0 auto' }}>
+                                     <div style={{
+                                         ...scaledContainer,
+                                         paddingTop: `${titleBgHeightMultiplier * 1.25 * 16 * scaleRatio}px`,
+                                         paddingBottom: `${titleBgHeightMultiplier * 1.25 * 16 * scaleRatio}px`,
+                                     }}>
+                                         {tmplId === 'podcast-ribbon' && (
+                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: `${6 * scaleRatio}px`, marginBottom: `${8 * scaleRatio}px`, position: 'relative' }}>
+                                                 <span style={{ width: `${8 * scaleRatio}px`, height: `${8 * scaleRatio}px`, backgroundColor: '#dc2626', borderRadius: '50%', display: 'inline-block' }} />
+                                                 <span style={{ fontSize: `${10 * scaleRatio}px`, fontWeight: 900, color: '#fca5a5', letterSpacing: '0.1em' }}>
+                                                     🔴 LIVE ON AIR
+                                                 </span>
+                                             </div>
+                                         )}
+                                         {titleEl}
+                                     </div>
+                                     {subtitleEl && (
+                                         <div style={{
+                                             ...scaledSubtitleContainer,
+                                             transform: `scale(${subtitleSizeMultiplier * 0.95})`,
+                                             transformOrigin: 'center top',
+                                             marginTop: `${2 * scaleRatio}px`
+                                         }}>
+                                             {subtitleEl}
+                                         </div>
+                                     )}
+                                 </div>
+                             );
                         })()}
                     </div>
                 </div>

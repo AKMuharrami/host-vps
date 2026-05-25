@@ -535,6 +535,13 @@ app.post("/api/export-video", (req, res, next) => {
             const actualFontName = FONT_MAP[fontName] || fontName;
             await ensureFont(actualFontName);
 
+            // Preload the cover title font if applicable
+            if (styleOptionsParsed?.showCoverTitle && styleOptionsParsed?.coverFontFamily && styleOptionsParsed?.coverFontFamily !== 'template-default') {
+                const coverFontName = styleOptionsParsed.coverFontFamily;
+                const actualCoverFontName = FONT_MAP[coverFontName] || coverFontName;
+                await ensureFont(actualCoverFontName);
+            }
+
             styleOptionsParsed.captionsOnly = false;
             const inputProps = {
                 videoUrl: localVideoUrl,
@@ -601,10 +608,10 @@ app.post("/api/export-video", (req, res, next) => {
             const optimalConcurrency = cpuCount <= 2 ? 1 : Math.min(4, Math.max(1, Math.floor(cpuCount / (activeJobs + 1))));
             
             // Limit chunks on low resource machines to avoid overhead
-            const durationInFrames = inputProps.durationInFrames;
+            const totalDurationInFrames = inputProps.durationInFrames;
             const numChunks = cpuCount <= 2 ? 
-                (durationInFrames > 900 ? 2 : 1) : 
-                (durationInFrames > 600 ? 4 : (durationInFrames > 200 ? 2 : 1));
+                (totalDurationInFrames > 900 ? 2 : 1) : 
+                (totalDurationInFrames > 600 ? 4 : (totalDurationInFrames > 200 ? 2 : 1));
 
             console.log(`[Export] Starting parallel render. CPU Cores: ${cpuCount}, Active Jobs: ${activeJobs}, Chunks: ${numChunks}, Concurrency per chunk: ${optimalConcurrency}`);
             
@@ -612,8 +619,8 @@ app.post("/api/export-video", (req, res, next) => {
             const renderPromises: Promise<void>[] = [];
 
             for (let i = 0; i < numChunks; i++) {
-                const startFrame = Math.floor((durationInFrames / numChunks) * i);
-                const endFrame = i === numChunks - 1 ? durationInFrames - 1 : Math.floor((durationInFrames / numChunks) * (i + 1)) - 1;
+                const startFrame = Math.floor((totalDurationInFrames / numChunks) * i);
+                const endFrame = i === numChunks - 1 ? totalDurationInFrames - 1 : Math.floor((totalDurationInFrames / numChunks) * (i + 1)) - 1;
                 const chunkPath = outputPath.replace('.mp4', `_chunk_${i}.mp4`);
                 chunkPaths.push(chunkPath);
 

@@ -1,6 +1,134 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { AbsoluteFill, useCurrentFrame, useVideoConfig, Video, OffthreadVideo, delayRender, continueRender, spring, interpolate } from 'remotion';
 
+const isArabicText = (text: string) => {
+  const arabicPattern = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+  return arabicPattern.test(text);
+};
+
+// Map of template styles to inline CSS
+const TITLE_TEMPLATE_STYLES: Record<string, {
+    layoutType: string;
+    container: React.CSSProperties;
+    title: React.CSSProperties;
+    subtitle: React.CSSProperties;
+    subtitleContainer?: React.CSSProperties;
+}> = {
+    'elegant-clean': {
+        layoutType: 'no-box',
+        container: { backgroundColor: 'transparent', padding: '12px', textAlign: 'center' },
+        title: { fontWeight: 300, color: 'white', letterSpacing: '0.05em', lineHeight: '1.6', textShadow: '0 2px 8px rgba(0,0,0,0.95)', textAlign: 'center' },
+        subtitle: { fontWeight: 'bold', color: '#c7d2fe', letterSpacing: '0.18em', textTransform: 'uppercase', backgroundColor: 'rgba(49, 46, 129, 0.8)', border: '1px solid rgba(99, 102, 241, 0.3)', padding: '4px 14px', borderRadius: '9999px', display: 'inline-block', backdropFilter: 'blur(4px)', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }
+    },
+    'viral-pop': {
+        layoutType: 'split-cards',
+        container: { background: 'linear-gradient(to top right, #facc15, #f59e0b, #fef08a)', padding: '24px', borderRadius: '24px', borderWidth: '3px', borderStyle: 'solid', borderColor: 'black', boxShadow: '6px 6px 0px rgba(0,0,0,1)', textAlign: 'center', maxWidth: '92%', margin: '0 auto', transform: 'rotate(-0.3deg)' },
+        title: { fontWeight: 900, color: 'black', lineHeight: '1.2' },
+        subtitle: { fontWeight: 900, color: '#fef08a', lineHeight: '1' },
+        subtitleContainer: { backgroundColor: 'black', borderWidth: '2px', borderStyle: 'solid', borderColor: 'black', color: '#fef08a', padding: '4px 16px', borderRadius: '24px', boxShadow: '4px 4px 0px rgba(0,0,0,1)', transform: 'rotate(0.4deg)', display: 'inline-block' }
+    },
+    'hormozi-bolt': {
+        layoutType: 'split-cards',
+        container: { backgroundColor: '#0D0D11', borderWidth: '3px', borderStyle: 'solid', borderColor: '#eab308', padding: '20px', borderRadius: '16px', boxShadow: '6px 6px 0px rgba(234,179,8,0.25)', textAlign: 'center', maxWidth: '90%', margin: '0 auto', transform: 'rotate(-0.4deg)' },
+        title: { fontWeight: 900, color: '#eab308', letterSpacing: '0.05em', textTransform: 'uppercase', textShadow: '0 2px 4px rgba(0,0,0,0.8)', lineHeight: '1.2' },
+        subtitle: { fontWeight: 800, color: '#34d399', lineHeight: '1', textTransform: 'uppercase', letterSpacing: '-0.02em' },
+        subtitleContainer: { backgroundColor: '#0D0D11', borderWidth: '2px', borderStyle: 'solid', borderColor: 'rgba(16, 185, 129, 0.3)', padding: '4px 14px', borderRadius: '12px', boxShadow: '4px 4px 0px rgba(16,185,129,0.15)', transform: 'rotate(0.3deg)', display: 'inline-block' }
+    },
+    'luxury-serif': {
+        layoutType: 'split-cards',
+        container: { background: 'linear-gradient(to bottom, #0c0a09, rgba(28, 25, 23, 0.95))', padding: '24px', borderRadius: '16px', border: '1px solid rgba(245, 158, 11, 0.3)', boxShadow: '0 12px 40px rgba(245,158,11,0.12)', textAlign: 'center', maxWidth: '94%', margin: '0 auto' },
+        title: { fontWeight: 900, color: '#fef3c7', textShadow: '0 2px 4px rgba(0,0,0,0.8)', lineHeight: '1.6' },
+        subtitle: { fontWeight: 500, color: '#e7e5e4', letterSpacing: '0.05em', textTransform: 'uppercase', lineHeight: '1' },
+        subtitleContainer: { backgroundColor: 'rgba(69, 26, 3, 0.4)', border: '1px solid rgba(245, 158, 11, 0.2)', padding: '6px 12px', borderRadius: '8px', backdropFilter: 'blur(4px)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'inline-block' }
+    },
+    'fuji-modern': {
+        layoutType: 'split-cards',
+        container: { backgroundColor: 'rgba(30, 27, 75, 0.45)', backdropFilter: 'blur(20px)', border: '1px solid rgba(129, 140, 248, 0.2)', padding: '20px', borderRadius: '16px', boxShadow: '0 8px 32px rgba(99,102,241,0.15)', textAlign: 'center', maxWidth: '92%', margin: '0 auto' },
+        title: { fontWeight: 800, color: 'white', letterSpacing: '0.05em', lineHeight: '1.2', textShadow: '0 2px 10px rgba(0,0,0,0.5)' },
+        subtitle: { fontWeight: 500, color: '#c7d2fe', lineHeight: '1' },
+        subtitleContainer: { backgroundColor: 'rgba(217, 70, 239, 0.2)', border: '1px solid rgba(232, 121, 249, 0.2)', padding: '6px 14px', borderRadius: '9999px', display: 'inline-block', backdropFilter: 'blur(8px)', boxShadow: '0 5px 15px rgba(240,70,170,0.15)' }
+    },
+    'vintage-journal': {
+        layoutType: 'split-cards',
+        container: { backgroundColor: '#fcf8f2', border: '2px solid rgba(28,25,23,0.1)', padding: '20px', borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.15)', textAlign: 'right', maxWidth: '90%', margin: '0 auto' },
+        title: { fontWeight: 800, color: '#1c1917', lineHeight: '1.6' },
+        subtitle: { fontWeight: 'bold', color: '#854d0e', lineHeight: '1.2' },
+        subtitleContainer: { backgroundColor: '#eedfcb', border: '1px solid rgba(28,25,23,0.05)', padding: '4px 12px', borderRadius: '6px', textAlign: 'right', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', display: 'inline-block' }
+    },
+    'vox-frame': {
+        layoutType: 'split-cards',
+        container: { backgroundColor: '#111115', border: '1px solid rgba(255,255,255,0.1)', padding: '20px', borderRadius: '12px', boxShadow: '0 15px 35px rgba(0,0,0,0.5)', textAlign: 'right', maxWidth: '92%', margin: '0 auto' },
+        title: { fontWeight: 900, color: 'white', lineHeight: '1.4' },
+        subtitle: { color: '#f97316', fontWeight: 800, lineHeight: '1', textTransform: 'uppercase', letterSpacing: '0.05em' },
+        subtitleContainer: { backgroundColor: 'rgba(249, 115, 22, 0.1)', border: '1px solid rgba(249, 115, 22, 0.25)', padding: '4px 10px', borderRadius: '6px', display: 'inline-flex' }
+    },
+    'hyper-glow': {
+        layoutType: 'split-cards',
+        container: { backgroundColor: 'rgba(10, 10, 16, 0.95)', backdropFilter: 'blur(8px)', padding: '20px', borderRadius: '16px', border: '1px solid rgba(99, 102, 241, 0.3)', boxShadow: '0 0 25px rgba(99,102,241,0.25)', textAlign: 'center', maxWidth: '90%', margin: '0 auto' },
+        title: { fontWeight: 800, color: 'white', letterSpacing: '0.05em', textTransform: 'uppercase', textShadow: '0 0 12px rgba(99,102,241,0.85)', lineHeight: '1.2' },
+        subtitle: { fontWeight: 'bold', color: '#f472b6', lineHeight: '1' },
+        subtitleContainer: { backgroundColor: 'rgba(29, 16, 46, 0.85)', border: '1px solid rgba(240, 70, 170, 0.2)', padding: '4px 12px', borderRadius: '8px', boxShadow: '0 0 15px rgba(240,70,170,0.2)', display: 'inline-block' }
+    },
+    'challenge-3d': {
+        layoutType: 'split-cards',
+        container: { background: 'linear-gradient(to top right, #ea580c, #f97316, #fb923c)', padding: '20px', borderRadius: '16px', border: '4px solid black', boxShadow: '5px 5px 0px rgba(0,0,0,1)', textAlign: 'center', maxWidth: '92%', margin: '0 auto', transform: 'rotate(-0.5deg)' },
+        title: { fontWeight: 900, color: 'white', textTransform: 'uppercase', textShadow: '0 3px 0px rgba(0,0,0,1)', lineHeight: '1.2' },
+        subtitle: { fontWeight: 800, color: '#fef08a', lineHeight: '1', textTransform: 'uppercase' },
+        subtitleContainer: { backgroundColor: 'black', color: 'white', padding: '6px 12px', borderRadius: '4px', border: '2px solid black', transform: 'rotate(0.4deg)', boxShadow: '3px 3px 0px rgba(0,0,0,1)', display: 'inline-block' }
+    },
+    'neon-glow': {
+        layoutType: 'split-cards',
+        container: { backgroundColor: 'rgba(2, 6, 23, 0.9)', padding: '24px', borderRadius: '12px', border: '2px solid #22d3ee', boxShadow: '0 0 15px rgba(34,211,238,0.4), inset 0 0 10px rgba(236,72,153,0.2)', textAlign: 'center', maxWidth: '90%', margin: '0 auto' },
+        title: { fontWeight: 800, color: '#22d3ee', textShadow: '0 0 8px rgba(34,211,238,0.7)', textTransform: 'uppercase', lineHeight: '1.2' },
+        subtitle: { fontWeight: 900, color: '#ec4899', letterSpacing: '0.05em', textShadow: '0 0 6px rgba(236,72,153,0.7)' },
+    },
+    'tiktok-header': {
+        layoutType: 'split-cards',
+        container: { backgroundColor: '#18181b', border: '1px solid #27272a', padding: '18px', borderRadius: '16px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', textAlign: 'center', maxWidth: '94%', margin: '0 auto' },
+        title: { fontWeight: 900, color: 'white', lineHeight: '1.4' },
+        subtitle: { color: '#22c55e', fontWeight: 'bold' },
+        subtitleContainer: { backgroundColor: 'rgba(34, 197, 94, 0.1)', color: '#22c55e', padding: '2px 8px', borderRadius: '9999px', display: 'inline-flex' }
+    },
+    'podcast-ribbon': {
+        layoutType: 'split-cards',
+        container: { backgroundColor: 'rgba(127, 29, 29, 0.3)', border: '1px solid rgba(239, 68, 68, 0.25)', backdropFilter: 'blur(8px)', padding: '20px', borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', textAlign: 'center', maxWidth: '90%', margin: '0 auto' },
+        title: { fontWeight: 'bold', color: 'white', textTransform: 'uppercase', lineHeight: '1.2' },
+        subtitle: { color: '#fca5a5', fontWeight: 800 }
+    },
+    'minimal-outline': {
+        layoutType: 'split-cards',
+        container: { backgroundColor: 'transparent', padding: '16px', textAlign: 'center', maxWidth: '95%', margin: '0 auto' },
+        title: { fontWeight: 900, color: 'white', textTransform: 'uppercase', letterSpacing: '-0.02em', textShadow: '0 2px 4px rgba(0,0,0,0.8)', lineHeight: '1.2' },
+        subtitle: { fontWeight: 500, color: '#e7e5e4', letterSpacing: '0.05em', textShadow: '0 1.5px 2px rgba(0,0,0,0.8)' }
+    },
+    'breaking-news': {
+        layoutType: 'split-cards',
+        container: { backgroundColor: '#991b1b', borderLeftWidth: '6px', borderLeftStyle: 'solid', borderLeftColor: '#facc15', padding: '20px', borderRadius: '0px', boxShadow: '2px 10px 35px rgba(0,0,0,0.45)', textAlign: 'right', maxWidth: '94%', margin: '0 auto' },
+        title: { fontWeight: 900, color: 'white', lineHeight: '1.4', textShadow: '0 2px 4px rgba(0,0,0,0.3)' },
+        subtitle: { fontWeight: 900, color: '#facc15' },
+        subtitleContainer: { backgroundColor: 'rgba(0,0,0,0.4)', padding: '4px 8px', borderRadius: '4px', display: 'inline-block' }
+    },
+    'manga-action': {
+        layoutType: 'split-cards',
+        container: { background: 'linear-gradient(to top right, #ea580c, #f59e0b)', padding: '24px', borderRadius: '16px', border: '4px solid black', boxShadow: '5px 5px 0px rgba(0,0,0,1)', textAlign: 'center', maxWidth: '90%', margin: '0 auto', transform: 'rotate(-0.5deg)' },
+        title: { fontWeight: 900, color: 'white', textTransform: 'uppercase', textShadow: '0 2.5px 0px rgba(0,0,0,1)', lineHeight: '1.2' },
+        subtitle: { fontWeight: 'bold', color: '#facc15' },
+        subtitleContainer: { backgroundColor: 'black', color: 'white', padding: '4px 10px', borderRadius: '6px', border: '2px solid black', display: 'inline-block' }
+    },
+    'retro-synthwave': {
+        layoutType: 'split-cards',
+        container: { background: 'linear-gradient(to bottom, #2e1065, #020617, #2e1065)', padding: '24px', borderRadius: '24px', border: '1px solid #d946ef', boxShadow: '0 0 20px rgba(240,46,170,0.25)', textAlign: 'center', maxWidth: '92%', margin: '0 auto' },
+        title: { fontWeight: 800, color: '#facc15', textTransform: 'uppercase', letterSpacing: '0.05em', textShadow: '0 1.5px 1px rgba(0,0,0,0.5)', lineHeight: '1.2' },
+        subtitle: { fontWeight: 600, color: '#67e8f9', letterSpacing: '0.1em' }
+    },
+    'athletic-extreme': {
+        layoutType: 'split-cards',
+        container: { backgroundColor: '#1c1917', borderRightWidth: '6px', borderRightStyle: 'solid', borderRightColor: '#a3e635', padding: '20px', borderRadius: '0px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', textAlign: 'right', maxWidth: '90%', margin: '0 auto', transform: 'skewX(-2.5deg)' },
+        title: { fontWeight: 900, color: '#a3e635', textTransform: 'uppercase', fontStyle: 'italic', lineHeight: '1.2' },
+        subtitle: { fontWeight: 500, color: 'rgba(255,255,255,0.95)', fontStyle: 'italic' }
+    }
+};
+
 // Simple implementation simulating the App.tsx styles
 export const CaptionsComposition = ({
     videoUrl,
@@ -37,6 +165,12 @@ export const CaptionsComposition = ({
     const baseFont = FONT_MAP[styleOptions.fontFamily] || styleOptions.fontFamily || 'Janna LT';
     const displayFont = `${baseFont}, sans-serif`;
 
+    const coverFontRaw = styleOptions.coverFontFamily || 'template-default';
+    const coverFont = coverFontRaw !== 'template-default'
+        ? (FONT_MAP[styleOptions.coverFontFamily] || styleOptions.coverFontFamily || 'Janna LT')
+        : baseFont;
+    const resolvedCoverFont = `${coverFont}, sans-serif`;
+
     useEffect(() => {
         if (!styleOptions.fontFamily) {
             setFontLoaded(true);
@@ -44,48 +178,55 @@ export const CaptionsComposition = ({
             return;
         }
 
-        const fontUrl = `http://127.0.0.1:${expressPort || 3005}/fonts/${encodeURIComponent(baseFont + '_v2.ttf')}`;
-        
-        // Fix: Register weights up to 900. If we use the same file, the browser 
-        // will use synthetic bolding for weights it thinks are too light relative 
-        // to requested weight, but registering them explicitly helps with some 
-        // CSS engine edge cases in Chromium.
-        const weights = ['normal', '400', '700', '800', '900']; 
-        
-        Promise.all(weights.map(weight => {
-            const font = new FontFace(baseFont, `url(${fontUrl})`, { weight });
-            return font.load().then(f => f);
-        })).then((loadedFonts) => {
-            loadedFonts.forEach(f => document.fonts.add(f));
+        const fontsToLoad = [baseFont];
+        if (styleOptions.showCoverTitle && coverFont !== baseFont) {
+            fontsToLoad.push(coverFont);
+        }
+
+        const weights = ['normal', '400', '700', '800', '900'];
+
+        const loadFont = async (name: string) => {
+            const fontUrl = `http://127.0.0.1:${expressPort || 3005}/fonts/${encodeURIComponent(name + '_v2.ttf')}`;
+            try {
+                const loaded = await Promise.all(weights.map(async (weight) => {
+                    const font = new FontFace(name, `url(${fontUrl})`, { weight });
+                    const f = await font.load();
+                    return f;
+                }));
+                loaded.forEach(f => document.fonts.add(f));
+            } catch (err) {
+                console.error('Failed to load font from local server:', fontUrl, err);
+                // Fallback to Janna Regular if it fails and is Janna
+                if (name.includes('Janna')) {
+                    const fbFont = new FontFace(name, `url(https://hjrm8lbtnby37npy.public.blob.vercel-storage.com/Janna%20LT%20Regular.ttf)`, {
+                        weight: 'normal'
+                    });
+                    try {
+                        const loaded = await fbFont.load();
+                        document.fonts.add(loaded);
+                    } catch (fbErr) {
+                        console.error('Failed to load fallback font:', fbErr);
+                    }
+                } else {
+                    const familyName = name.replace(/ /g, '+');
+                    const weight = styleOptions.fontWeight || '400';
+                    const link = document.createElement('link');
+                    link.rel = 'stylesheet';
+                    link.href = `https://fonts.googleapis.com/css2?family=${familyName}:wght@${weight}&display=swap`;
+                    await new Promise((resolve) => {
+                        link.onload = () => { document.fonts.ready.then(() => resolve(null)); };
+                        link.onerror = () => { resolve(null); };
+                        document.head.appendChild(link);
+                    });
+                }
+            }
+        };
+
+        Promise.all(fontsToLoad.map(loadFont)).finally(() => {
             setFontLoaded(true);
             continueRender(handle);
-        }).catch((err) => {
-            console.error('Failed to load font from local server:', fontUrl, err);
-            // Fallback to previous logic if local fails
-            if (baseFont.includes('Janna')) {
-                const fbFont = new FontFace(baseFont, `url(https://hjrm8lbtnby37npy.public.blob.vercel-storage.com/Janna%20LT%20Regular.ttf)`, {
-                    weight: 'normal'
-                });
-                fbFont.load().then(() => {
-                    document.fonts.add(fbFont);
-                    setFontLoaded(true);
-                    continueRender(handle);
-                }).catch(() => {
-                    setFontLoaded(true);
-                    continueRender(handle);
-                });
-            } else {
-                const familyName = baseFont.replace(/ /g, '+');
-                const weight = styleOptions.fontWeight || '400';
-                const link = document.createElement('link');
-                link.rel = 'stylesheet';
-                link.href = `https://fonts.googleapis.com/css2?family=${familyName}:wght@${weight}&display=swap`;
-                link.onload = () => { document.fonts.ready.then(() => { setFontLoaded(true); continueRender(handle); }); };
-                link.onerror = () => { setFontLoaded(true); continueRender(handle); };
-                document.head.appendChild(link);
-            }
         });
-    }, [baseFont, handle, styleOptions.fontWeight, expressPort]);
+    }, [baseFont, coverFont, handle, styleOptions.fontWeight, expressPort, styleOptions.showCoverTitle]);
 
     // Apply inline style logic from App.tsx
     const shadowOpacity = styleOptions?.shadowOpacity ?? 80;
@@ -146,17 +287,12 @@ export const CaptionsComposition = ({
     
     const posX = (styleOptions?.captionPosition?.x ?? 0) * scaleRatio;
     const posY = (styleOptions?.captionPosition?.y ?? 0) * scaleRatio;
+    
+    // Check if the cover title is currently active
+    const showCover = styleOptions?.showCoverTitle && currentTime <= (styleOptions?.coverDuration ?? 2.5);
 
     return (
         <AbsoluteFill style={{ backgroundColor: styleOptions?.captionsOnly ? 'transparent' : 'black' }}>
-            <style>{`
-                * {
-                    -webkit-font-smoothing: antialiased;
-                    -moz-osx-font-smoothing: grayscale;
-                    text-rendering: geometricPrecision;
-                    font-smooth: always;
-                }
-            `}</style>
             {!styleOptions?.captionsOnly && (
                 <OffthreadVideo 
                     src={videoUrl} 
@@ -165,7 +301,7 @@ export const CaptionsComposition = ({
                 />
             )}
             
-            {activeCaption && fontLoaded && (
+            {activeCaption && fontLoaded && !showCover && (
                 <div style={{
                     position: 'absolute',
                     left: 0,
@@ -216,7 +352,6 @@ export const CaptionsComposition = ({
                             paintOrder: 'stroke fill',
                             textShadow: textShadowValue,
                             direction: 'rtl', // specific to Arabic
-                            textRendering: 'optimizeLegibility',
                             transform: `translate(${posX}px, calc(${posY}px + ${blockTranslateY}px)) scale(${blockScale})`
                         }}
                         dir="rtl"
@@ -247,10 +382,10 @@ export const CaptionsComposition = ({
                                 const isHighlighted = isWordAnim && (currentTime >= wordStartTime && currentTime <= wordEndTime);
                                 
                                 const wordHighlightColor = styleOptions?.wordHighlightColor ?? '#3e81f6';
-
+ 
                                 // Optimization: Only apply heavy transforms during active range
                                 const isActive = frame >= wordStartFrame - 5 && frame <= wordEndFrame + 5;
-
+ 
                                 let wordScale = 1;
                                 if (isWordAnim && isActive) {
                                     if (frame >= wordStartFrame && frame < wordEndFrame) {
@@ -269,7 +404,7 @@ export const CaptionsComposition = ({
                                         );
                                     }
                                 }
-
+ 
                                 return (
                                     <span
                                         key={i}
@@ -278,8 +413,7 @@ export const CaptionsComposition = ({
                                             fontWeight: styleOptions?.fontWeight || 'normal',
                                             color: isHighlighted ? wordHighlightColor : undefined,
                                             transform: wordScale !== 1 ? `scale(${wordScale})` : 'none',
-                                            transformOrigin: 'center',
-                                            WebkitFontSmoothing: 'antialiased'
+                                            transformOrigin: 'center'
                                         }}
                                     >
                                         {word}
@@ -288,6 +422,149 @@ export const CaptionsComposition = ({
                             })}
                         </div>
                     </span>
+                </div>
+            )}
+
+            {showCover && fontLoaded && (
+                <div style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '16px',
+                    backgroundColor: 'rgba(0,0,0,0.55)',
+                    pointerEvents: 'none',
+                    zIndex: 50,
+                    backdropFilter: 'blur(2px)'
+                }}>
+                    <div style={{
+                        width: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        position: 'relative',
+                        top: '15%'
+                    }}>
+                        {(() => {
+                            const tmplId = styleOptions?.selectedTitleTemplate || 'viral-pop';
+                            const template = TITLE_TEMPLATE_STYLES[tmplId] || TITLE_TEMPLATE_STYLES['viral-pop'];
+                            const layoutType = template.layoutType;
+                            
+                            const isArabicTitle = isArabicText(styleOptions?.coverTitle || '');
+                            const isArabicSub = isArabicText(styleOptions?.coverSubtitle || '');
+                            
+                            const titleFontSizeMultiplier = styleOptions?.titleFontSizeMultiplier ?? 1;
+                            const titleBgHeightMultiplier = styleOptions?.titleBgHeightMultiplier ?? 1;
+                            const subtitleSizeMultiplier = styleOptions?.subtitleSizeMultiplier ?? 1;
+                            const brushColor = styleOptions?.brushColor ?? '#facc15';
+                            
+                            // Scale dimensions based on videoHeight scaleRatio
+                            const baseTitleSize = tmplId === 'elegant-clean' ? 20 : 17;
+                            const scaledTitleFontSize = Math.floor(baseTitleSize * scaleRatio * titleFontSizeMultiplier);
+                            const scaledSubtitleFontSize = Math.floor(10 * scaleRatio);
+                            
+                            const customStyles: React.CSSProperties = {
+                                fontFamily: resolvedCoverFont,
+                                lineHeight: '1.4',
+                                padding: '0.1em 0.2em',
+                                fontSize: `${scaledTitleFontSize}px`,
+                                direction: isArabicTitle ? 'rtl' : 'ltr',
+                                textAlign: 'center',
+                                margin: 0
+                            };
+                            
+                            const mergedTitleStyle = { ...template.title, ...customStyles };
+                            
+                            if (tmplId === 'retro-synthwave') {
+                                mergedTitleStyle.backgroundImage = 'linear-gradient(to right, #facc15, #ec4899, #22d3ee)';
+                                mergedTitleStyle.WebkitBackgroundClip = 'text';
+                                (mergedTitleStyle as any).WebkitTextFillColor = 'transparent';
+                            }
+                            
+                            const titleEl = (
+                                <h2 style={mergedTitleStyle}>
+                                    {styleOptions?.coverTitle || ''}
+                                </h2>
+                            );
+                            
+                            const subtitleEl = styleOptions?.coverSubtitle ? (
+                                <p style={{
+                                    ...template.subtitle,
+                                    fontFamily: resolvedCoverFont,
+                                    lineHeight: '1.3',
+                                    fontSize: `${scaledSubtitleFontSize}px`,
+                                    direction: isArabicSub ? 'rtl' : 'ltr',
+                                    margin: 0
+                                }}>
+                                    {styleOptions?.coverSubtitle}
+                                </p>
+                            ) : null;
+                            
+                            if (layoutType === 'no-box') {
+                                return (
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: '4px', maxWidth: '95%', margin: '0 auto', padding: '8px 0' }}>
+                                        <div>
+                                            {titleEl}
+                                        </div>
+                                        {subtitleEl && (
+                                            <div style={{
+                                                transform: `scale(${subtitleSizeMultiplier})`,
+                                                transformOrigin: 'center top',
+                                                marginTop: '2px',
+                                                opacity: 0.95
+                                            }}>
+                                                {subtitleEl}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            }
+                            
+                            return (
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', width: '100%', maxWidth: '95%', margin: '0 auto' }}>
+                                    <div style={{
+                                        ...template.container,
+                                        paddingTop: `${titleBgHeightMultiplier * 1.25}rem`,
+                                        paddingBottom: `${titleBgHeightMultiplier * 1.25}rem`,
+                                    }}>
+                                        {tmplId === 'podcast-ribbon' && (
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '8px', position: 'relative' }}>
+                                                <span style={{ width: '8px', height: '8px', backgroundColor: '#dc2626', borderRadius: '50%', display: 'inline-block' }} />
+                                                <span style={{ fontSize: '10px', fontWeight: 900, color: '#fca5a5', letterSpacing: '0.1em' }}>
+                                                    🔴 LIVE ON AIR
+                                                </span>
+                                            </div>
+                                        )}
+                                        {titleEl}
+                                    </div>
+                                    {subtitleEl && (
+                                        <div style={{
+                                            ...(template.subtitleContainer || {
+                                                backgroundColor: 'rgba(17, 17, 21, 0.95)',
+                                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                                padding: '6px 14px',
+                                                borderRadius: '9999px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center'
+                                            }),
+                                            transform: `scale(${subtitleSizeMultiplier * 0.95})`,
+                                            transformOrigin: 'center top',
+                                            marginTop: '2px'
+                                        }}>
+                                            {subtitleEl}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
+                    </div>
                 </div>
             )}
         </AbsoluteFill>

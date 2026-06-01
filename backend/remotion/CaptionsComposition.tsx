@@ -54,8 +54,8 @@ const TITLE_TEMPLATE_STYLES: Record<string, {
 }> = {
     'elegant-clean': {
         layoutType: 'no-box',
-        container: { backgroundColor: 'transparent', padding: '12px', textAlign: 'center' },
-        title: { fontWeight: 300, color: 'white', letterSpacing: '0.05em', lineHeight: '1.6', textShadow: '0 2px 8px rgba(0,0,0,0.95)', textAlign: 'center' },
+        container: { backgroundColor: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(12px)', padding: '20px', borderRadius: '16px', textAlign: 'center', maxWidth: '92%', margin: '0 auto' },
+        title: { fontWeight: 300, color: 'white', letterSpacing: '0.05em', lineHeight: '1.6', textShadow: '0 2px 4px rgba(0,0,0,0.5)', textAlign: 'center' },
         subtitle: { fontWeight: 'bold', color: '#c7d2fe', letterSpacing: '0.18em', textTransform: 'uppercase', backgroundColor: 'rgba(49, 46, 129, 0.8)', border: '1px solid rgba(99, 102, 241, 0.3)', padding: '4px 14px', borderRadius: '9999px', display: 'inline-block', backdropFilter: 'blur(4px)', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }
     },
     'viral-pop': {
@@ -89,7 +89,7 @@ const TITLE_TEMPLATE_STYLES: Record<string, {
     },
     'fuji-modern': {
         layoutType: 'split-cards',
-        container: { backgroundColor: 'rgba(30, 27, 75, 0.45)', backdropFilter: 'blur(20px)', border: '1px solid rgba(129, 140, 248, 0.2)', padding: '20px', borderRadius: '16px', boxShadow: '0 8px 32px rgba(99,102,241,0.15)', textAlign: 'center', maxWidth: '92%', margin: '0 auto' },
+        container: { backgroundColor: 'rgba(30, 27, 75, 0.8)', backdropFilter: 'blur(24px)', border: '1px solid rgba(129, 140, 248, 0.2)', padding: '20px', borderRadius: '16px', boxShadow: '0 8px 32px rgba(99,102,241,0.15)', textAlign: 'center', maxWidth: '92%', margin: '0 auto' },
         title: { fontWeight: 800, color: 'white', letterSpacing: '0.05em', textTransform: 'uppercase', lineHeight: '1.2', textShadow: '0 2px 10px rgba(0,0,0,0.5)' },
         subtitle: { fontWeight: 500, color: '#c7d2fe', lineHeight: '1' },
         subtitleContainer: { backgroundColor: 'rgba(217, 70, 239, 0.2)', border: '1px solid rgba(232, 121, 249, 0.2)', padding: '6px 14px', borderRadius: '9999px', display: 'inline-block', backdropFilter: 'blur(8px)', boxShadow: '0 5px 15px rgba(240,70,170,0.15)' }
@@ -137,15 +137,15 @@ const TITLE_TEMPLATE_STYLES: Record<string, {
     },
     'podcast-ribbon': {
         layoutType: 'split-cards',
-        container: { backgroundColor: 'rgba(127, 29, 29, 0.3)', border: '1px solid rgba(239, 68, 68, 0.25)', backdropFilter: 'blur(8px)', padding: '20px', borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', textAlign: 'center', maxWidth: '90%', margin: '0 auto' },
+        container: { backgroundColor: 'rgba(127, 29, 29, 0.8)', border: '1px solid rgba(239, 68, 68, 0.3)', backdropFilter: 'blur(12px)', padding: '20px', borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', textAlign: 'center', maxWidth: '90%', margin: '0 auto' },
         title: { fontWeight: 'bold', color: 'white', textTransform: 'uppercase', lineHeight: '1.2' },
         subtitle: { color: '#fca5a5', fontWeight: 800 }
     },
     'minimal-outline': {
         layoutType: 'split-cards',
-        container: { backgroundColor: 'transparent', padding: '16px', textAlign: 'center', maxWidth: '95%', margin: '0 auto' },
-        title: { fontWeight: 900, color: 'white', textTransform: 'uppercase', letterSpacing: '-0.02em', textShadow: '0 2px 4px rgba(0,0,0,0.8)', lineHeight: '1.2' },
-        subtitle: { fontWeight: 500, color: '#e7e5e4', letterSpacing: '0.05em', textShadow: '0 1.5px 2px rgba(0,0,0,0.8)' }
+        container: { backgroundColor: 'rgba(0, 0, 0, 0.5)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.05)', padding: '20px', borderRadius: '16px', textAlign: 'center', maxWidth: '95%', margin: '0 auto' },
+        title: { fontWeight: 900, color: 'white', textTransform: 'uppercase', letterSpacing: '-0.02em', textShadow: '0 2px 4px rgba(0,0,0,0.5)', lineHeight: '1.2' },
+        subtitle: { fontWeight: 500, color: '#e7e5e4', letterSpacing: '0.05em', textShadow: '0 1.5px 2px rgba(0,0,0,0.5)' }
     },
     'breaking-news': {
         layoutType: 'split-cards',
@@ -418,9 +418,17 @@ export const CaptionsComposition = ({
                              {activeCaption.text.split(' ').map((word: string, i: number, arr: string[]) => {
                                 const isWordAnim = styleOptions?.animationMode === 'word' || styleOptions?.animationMode === 'highlight';
                                 const duration = activeCaption.end - activeCaption.start;
-                                const scaledDuration = duration / (styleOptions?.wordSpeedMultiplier ?? 1);
-                                const wordStartTime = activeCaption.start + (i / arr.length) * scaledDuration;
-                                const wordEndTime = activeCaption.start + ((i + 1) / arr.length) * scaledDuration;
+                                const wordObj = activeCaption.words?.[i];
+                                
+                                const actualStart = wordObj ? wordObj.start : (activeCaption.start + (i / arr.length) * duration);
+                                const actualEnd = wordObj ? wordObj.end : (activeCaption.start + ((i + 1) / arr.length) * duration);
+
+                                const startOffset = actualStart - activeCaption.start;
+                                const endOffset = actualEnd - activeCaption.start;
+                                const speedMultiplier = styleOptions?.wordSpeedMultiplier ?? 1;
+
+                                const wordStartTime = activeCaption.start + (startOffset / speedMultiplier);
+                                const wordEndTime = activeCaption.start + (endOffset / speedMultiplier);
                                 
                                 const wordStartFrame = Math.round(wordStartTime * fps);
                                 const wordEndFrame = Math.round(wordEndTime * fps);
@@ -483,10 +491,9 @@ export const CaptionsComposition = ({
                     alignItems: 'center',
                     justifyContent: 'center',
                     padding: '16px',
-                    backgroundColor: 'rgba(0,0,0,0.55)',
+                    backgroundColor: 'rgba(0,0,0,0.20)',
                     pointerEvents: 'none',
-                    zIndex: 50,
-                    backdropFilter: 'blur(2px)'
+                    zIndex: 50
                 }}>
                     <div style={{
                         width: '100%',
@@ -505,9 +512,9 @@ export const CaptionsComposition = ({
                             const isArabicTitle = isArabicText(styleOptions?.coverTitle || '');
                             const isArabicSub = isArabicText(styleOptions?.coverSubtitle || '');
                             
-                            const titleFontSizeMultiplier = styleOptions?.titleFontSizeMultiplier ?? 1;
+                            const titleFontSizeMultiplier = styleOptions?.titleFontSizeMultiplier ?? 1.4;
                             const titleBgHeightMultiplier = styleOptions?.titleBgHeightMultiplier ?? 1;
-                            const subtitleSizeMultiplier = styleOptions?.subtitleSizeMultiplier ?? 1;
+                            const subtitleSizeMultiplier = styleOptions?.subtitleSizeMultiplier ?? 1.4;
                             const brushColor = styleOptions?.brushColor ?? '#facc15';
                             
                             // Scale dimensions based on videoHeight scaleRatio

@@ -295,9 +295,22 @@ export const CaptionsComposition = ({
     const shadowColorHex = styleOptions?.shadowColor || '#000000';
     const shadowColorStr = `${shadowColorHex}${Math.floor(shadowOpacity / 100 * 255).toString(16).padStart(2, '0')}`;
 
-    const textShadowValue = hasShadow 
-        ? `${shadowSize}px ${shadowSize}px 0px ${shadowColorStr}`
-        : 'none';
+    const shadows = [];
+    if (styleOptions?.hasStroke && scaledStroke > 0) {
+        const steps = 12;
+        for (let i = 0; i < steps; i++) {
+            const angle = (i * 2 * Math.PI) / steps;
+            const dx = (Math.cos(angle) * scaledStroke).toFixed(1);
+            const dy = (Math.sin(angle) * scaledStroke).toFixed(1);
+            shadows.push(`${dx}px ${dy}px 0px ${styleOptions.strokeColor}`);
+        }
+    }
+    
+    if (hasShadow && shadowSize > 0) {
+        shadows.push(`${shadowSize}px ${shadowSize}px ${shadowSize + 2}px ${shadowColorStr}`);
+    }
+
+    const textShadowValue = shadows.length > 0 ? shadows.join(', ') : 'none';
 
     // Animation Block
     let blockScale = 1;
@@ -379,23 +392,6 @@ export const CaptionsComposition = ({
                             borderColor: styleOptions?.hasBackground ? 'rgba(255,255,255,0.1)' : 'transparent',
                             lineHeight: '1.2',
                             fontWeight: styleOptions?.fontWeight || 'bold',
-                            WebkitTextStroke: styleOptions?.hasStroke 
-                                ? `${scaledStroke}px ${styleOptions?.strokeColor}` 
-                                : (() => {
-                                    const weight = styleOptions?.fontWeight;
-                                    const weightNum = parseInt(weight);
-                                    const isBold = weight === 'bold' || weight === 'black' || weightNum >= 700;
-                                    if (isBold) {
-                                        // If it's Janna LT, we need extra help since we don't have the bold file
-                                        const isJanna = (styleOptions?.fontFamily || '').toLowerCase().includes('janna');
-                                        const strokeWidth = isJanna 
-                                            ? Math.max(0.7, scaledFontSize * 0.015) // Thicker stroke for Janna LT Bold simulation
-                                            : Math.max(0.3, scaledFontSize * 0.005);
-                                        return `${strokeWidth}px currentColor`;
-                                    }
-                                    return 'none';
-                                })(),
-                            paintOrder: 'stroke fill',
                             textShadow: textShadowValue,
                             direction: 'rtl', // specific to Arabic
                             transform: `translate(${posX}px, calc(${posY}px + ${blockTranslateY}px)) scale(${blockScale})`

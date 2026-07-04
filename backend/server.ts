@@ -520,7 +520,25 @@ app.post("/api/export-video", (req, res, next) => {
             const rawDuration = parseFloat(req.body.duration);
             const validDuration = (isNaN(rawDuration) || rawDuration <= 0) ? 10 : rawDuration;
 
-            const durationInFrames = Math.max(1, Math.ceil(validDuration * 30));
+            // Fetch true FPS of the video
+            const sourceFps = await new Promise<number>((resolve) => {
+                import('child_process').then(({ exec }) => {
+                    exec(`ffprobe -v 0 -of csv=p=0 -select_streams v:0 -show_entries stream=r_frame_rate "${videoSource}"`, (error, stdout) => {
+                        if (error) return resolve(60); // default fallback
+                        const match = stdout.trim().split('/');
+                        if (match.length === 2) {
+                            const fps = Math.round(parseInt(match[0]) / parseInt(match[1]));
+                            return resolve(fps > 0 ? fps : 60);
+                        }
+                        if (!isNaN(parseFloat(stdout))) return resolve(Math.round(parseFloat(stdout)));
+                        resolve(60);
+                    });
+                });
+            });
+
+            console.log(`[Export] Detected source video FPS: ${sourceFps}`);
+
+            const durationInFrames = Math.max(1, Math.ceil(validDuration * sourceFps));
 
             const fontName = styleOptionsParsed?.fontFamily || 'font-sans';
             const FONT_MAP: Record<string, string> = {
@@ -636,7 +654,7 @@ app.post("/api/export-video", (req, res, next) => {
                         jpegQuality: 100, // Maximizing quality for parallel chunks
                         muted: true,
                         outputLocation: chunkPath,
-                        inputProps: { ...inputProps, styleOptions: styleOptionsParsed },
+                        inputProps: { ...inputProps, styleOptions: styleOptionsParsed, fps: sourceFps },
                         frameRange: [startFrame, endFrame],
                         concurrency: optimalConcurrency,
                         timeoutInMilliseconds: 300000,

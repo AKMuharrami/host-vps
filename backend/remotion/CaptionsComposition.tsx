@@ -432,6 +432,10 @@ export const CaptionsComposition = ({
                                 const isHighlighted = isWordAnim && (currentTime >= wordStartTime && currentTime <= wordEndTime);
                                 
                                 const wordHighlightColor = styleOptions?.wordHighlightColor ?? '#3e81f6';
+                                const useWordHighlightBg = styleOptions?.useWordHighlightBg ?? false;
+                                const wordHighlightBgColor = styleOptions?.wordHighlightBgColor ?? '#3e81f6';
+                                const wordScaleMultiplier = styleOptions?.wordScaleMultiplier ?? 1.15;
+                                const inactiveWordOpacity = styleOptions?.inactiveWordOpacity ?? 100;
  
                                 // Optimization: Only apply heavy transforms during active range
                                 const isActive = frame >= wordStartFrame - 5 && frame <= wordEndFrame + 5;
@@ -442,18 +446,29 @@ export const CaptionsComposition = ({
                                         wordScale = interpolate(
                                             frame - wordStartFrame,
                                             [0, 3], // small 3 frame pop
-                                            [1, 1.15],
+                                            [1, wordScaleMultiplier],
                                             { extrapolateRight: 'clamp' }
                                         );
                                     } else if (frame >= wordEndFrame) {
                                         wordScale = interpolate(
                                             frame - wordEndFrame,
                                             [0, 3], // 3 frame contract
-                                            [1.15, 1],
+                                            [wordScaleMultiplier, 1],
                                             { extrapolateRight: 'clamp' }
                                         );
                                     }
                                 }
+                                
+                                const baseColor = styleOptions?.textColor || 'white';
+                                const activeColor = useWordHighlightBg ? '#ffffff' : wordHighlightColor;
+                                const displayColor = isHighlighted ? activeColor : baseColor;
+                                const displayBg = isHighlighted && useWordHighlightBg ? wordHighlightBgColor : 'transparent';
+                                const displayOpacity = !isWordAnim || isHighlighted ? 1 : inactiveWordOpacity / 100;
+                                const paddingStr = isHighlighted && useWordHighlightBg ? '0.25rem 0.625rem' : '0';
+                                const borderRadiusStr = isHighlighted && useWordHighlightBg ? '0.75rem' : '0';
+                                const marginStr = isHighlighted && useWordHighlightBg ? '0 -1px' : '0';
+                                const borderStr = isHighlighted && useWordHighlightBg ? '1px solid rgba(255,255,255,0.1)' : 'none';
+                                const shadowStr = isHighlighted && useWordHighlightBg ? '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)' : 'none';
  
                                 return (
                                     <span
@@ -461,7 +476,14 @@ export const CaptionsComposition = ({
                                         style={{
                                             display: 'inline-block',
                                             fontWeight: styleOptions?.fontWeight || 'normal',
-                                            color: isHighlighted ? wordHighlightColor : undefined,
+                                            color: displayColor,
+                                            backgroundColor: displayBg,
+                                            opacity: displayOpacity,
+                                            padding: paddingStr,
+                                            borderRadius: borderRadiusStr,
+                                            margin: marginStr,
+                                            border: borderStr,
+                                            boxShadow: shadowStr,
                                             transform: wordScale !== 1 ? `scale(${wordScale})` : 'none',
                                             transformOrigin: 'center'
                                         }}

@@ -20,6 +20,12 @@ import ffmpegStatic from "ffmpeg-static";
 // Optional: Vercel Blob API (only if you fallback to blob links)
 import { del } from "@vercel/blob";
 
+const WORK_DIR = path.join(process.cwd(), 'temp_workspace');
+if (!fs.existsSync(WORK_DIR)) {
+  fs.mkdirSync(WORK_DIR, { recursive: true });
+}
+
+
 dotenv.config();
 
 // Initialize backend app
@@ -133,12 +139,12 @@ app.use(express.text({ limit: '200mb' }));
 app.use("/temp", (req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   next();
-}, express.static(os.tmpdir()));
+}, express.static(WORK_DIR));
 
 app.use("/fonts", (req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   next();
-}, express.static(path.join(os.tmpdir(), "fonts")));
+}, express.static(path.join(WORK_DIR, "fonts")));
 
 // Static route to serve Remotion bundle
 app.get("/", (req, res, next) => {
@@ -155,7 +161,7 @@ console.log(`[FFmpeg] Using binary at: ${validFfmpegPath}`);
 
 // --- NVENC WRAPPER SCRIPT INITIALIZATION ---
 // This is generated once at boot to be thread safe and support global GPU round robin logic across Remotion rendering jobs securely
-const wrapperPath = path.join(os.tmpdir(), "ffmpeg_nvenc_wrapper.sh");
+const wrapperPath = path.join(WORK_DIR, "ffmpeg_nvenc_wrapper.sh");
 process.env.REMOTION_FFMPEG_EXECUTABLE = wrapperPath;
 
 const wrapperScript = `#!/bin/bash
@@ -224,7 +230,7 @@ fs.chmodSync(wrapperPath, 0o755);
 // --------------------------------------------
 
 // Configure Multer for processing incoming video uploads directly to disk temporary storage
-const uploadDir = path.join(os.tmpdir(), 'uploads');
+const uploadDir = path.join(WORK_DIR, 'uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -264,7 +270,7 @@ async function downloadFont(fontName: string, url: string, fontsDir: string) {
 
 async function ensureFont(fontName: string): Promise<string | null> {
   console.log(`[Font Installer] Ensure font called with: '${fontName}'`);
-  const fontsDir = path.join(os.tmpdir(), 'fonts');
+  const fontsDir = path.join(WORK_DIR, 'fonts');
   if (!fs.existsSync(fontsDir)) fs.mkdirSync(fontsDir, { recursive: true });
 
   const normalizedKey = Object.keys(FONT_URLS).find(k => k.toLowerCase() === fontName.toLowerCase());
@@ -283,10 +289,13 @@ let activeJobs = 0;
 
 // Periodic cleanup for the entire temp directory every 15 mins
 setInterval(() => {
-  const tempDir = os.tmpdir();
+  const tempDir = WORK_DIR;
+  const uploadDir = path.join(tempDir, 'uploads');
+  const now = Date.now();
+
+  // Cleanup main temp dir
   fs.readdir(tempDir, (err, files) => {
     if (err) return;
-    const now = Date.now();
     files.forEach(file => {
       const filePath = path.join(tempDir, file);
       try {
@@ -294,12 +303,10 @@ setInterval(() => {
         // Delete files older than 10 minutes
         if (now - stats.mtimeMs > 10 * 60 * 1000) {
           if (stats.isDirectory()) {
-             // Only delete our specific temp dirs if we want to be safe, but here we can be a bit more aggressive
              if (file.startsWith('remotion-')) {
                 fs.rmSync(filePath, { recursive: true, force: true });
              }
           } else {
-             // Delete out_*.mp4, subs_*.srt, etc.
              if (file.startsWith('out_') || file.startsWith('subs_') || file.startsWith('dl_') || file.startsWith('concat_')) {
                 fs.unlinkSync(filePath);
              }
@@ -308,6 +315,23 @@ setInterval(() => {
       } catch (e) {}
     });
   });
+
+  // Cleanup uploads dir (Multer orphan files)
+  if (fs.existsSync(uploadDir)) {
+    fs.readdir(uploadDir, (err, files) => {
+      if (err) return;
+      files.forEach(file => {
+        const filePath = path.join(uploadDir, file);
+        try {
+          const stats = fs.statSync(filePath);
+          // Delete files older than 30 minutes
+          if (now - stats.mtimeMs > 30 * 60 * 1000) {
+            fs.unlinkSync(filePath);
+          }
+        } catch (e) {}
+      });
+    });
+  }
 }, 15 * 60 * 1000);
 
 let globalGpuIndexCounter = 0;
@@ -371,7 +395,7 @@ app.get("/api-status", (_req, res) => {
 app.get("/api/download-export/:fileId", (req, res) => {
   const { fileId } = req.params;
   const { name } = req.query;
-  const tempDir = os.tmpdir();
+  const tempDir = WORK_DIR;
   const filePath = path.join(tempDir, `out_${fileId}.mp4`);
   
   if (!fs.existsSync(filePath)) {
@@ -380,7 +404,23 @@ app.get("/api/download-export/:fileId", (req, res) => {
 
   const downloadName = name ? String(name) : 'exported_video.mp4';
   res.setHeader('Content-Type', 'video/mp4');
-  res.download(filePath, downloadName);
+  res.download(filePath, downloadName, (err) => {
+    if (err) {
+      console.error(`[Download] Error sending file ${filePath}:`, err);
+    } else {
+      console.log(`[Download] Successfully sent ${filePath}. Deleting to save space.`);
+    }
+    
+    // Immediately delete the file after download finishes (or fails)
+    try {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+      exportJobs.delete(fileId);
+    } catch (cleanupErr) {
+      console.error(`[Download] Cleanup error for ${filePath}:`, cleanupErr);
+    }
+  });
 });
 
 app.post("/api/export-video", (req, res, next) => {
@@ -437,15 +477,21 @@ app.post("/api/export-video", (req, res, next) => {
         // 1. Resolve Video Source (Download if URL to avoid FFmpeg TLS/Timeout issues)
         if (videoSource.startsWith('http')) {
            console.log(`[Export Background] Downloading video from URL: ${videoSource}`);
-           const dlRes = await fetch(videoSource);
-           if (!dlRes.ok) throw new Error('Failed to download video from URL');
-           const arr = await dlRes.arrayBuffer();
-           downloadedVideoPath = path.join(os.tmpdir(), `dl_${sessionId}.mp4`);
-           fs.writeFileSync(downloadedVideoPath, Buffer.from(arr));
-           videoSource = downloadedVideoPath;
+           const controller = new AbortController();
+           const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 mins timeout
+           try {
+               const dlRes = await fetch(videoSource, { signal: controller.signal });
+               if (!dlRes.ok) throw new Error('Failed to download video from URL');
+               const arr = await dlRes.arrayBuffer();
+               downloadedVideoPath = path.join(WORK_DIR, `dl_${sessionId}.mp4`);
+               fs.writeFileSync(downloadedVideoPath, Buffer.from(arr));
+               videoSource = downloadedVideoPath;
+           } finally {
+               clearTimeout(timeoutId);
+           }
         }
 
-        const tempDir = os.tmpdir();
+        const tempDir = WORK_DIR;
         outputPath = path.join(tempDir, `out_${sessionId}.mp4`);
         
         const vW = parseInt(videoWidth || '1080') || 1080;
@@ -512,7 +558,7 @@ app.post("/api/export-video", (req, res, next) => {
             const serveUrl = bundleLocation;
 
             // Provide a local URL for the video file using the Express server
-            const relativePath = path.relative(os.tmpdir(), videoSource);
+            const relativePath = path.relative(WORK_DIR, videoSource);
             const localVideoUrl = `http://127.0.0.1:${EXPRESS_PORT}/temp/${relativePath.replace(/\\/g, '/')}`;
 
             console.log(`[Export] Using bundle DIR for Remotion: ${serveUrl}`);
@@ -569,6 +615,7 @@ app.post("/api/export-video", (req, res, next) => {
                 videoWidth: Number(targetW),
                 videoHeight: Number(targetH),
                 durationInFrames: Number(durationInFrames),
+                fps: sourceFps,
                 expressPort: Number(EXPRESS_PORT)
             };
 
@@ -682,7 +729,7 @@ app.post("/api/export-video", (req, res, next) => {
             const tempVideoPath = outputPath.replace('.mp4', '_temp.mp4');
             
             // Create concat list for FFmpeg
-            const concatListPath = path.join(os.tmpdir(), `concat_${sessionId}.txt`);
+            const concatListPath = path.join(WORK_DIR, `concat_${sessionId}.txt`);
             const concatContent = chunkPaths.map(p => `file '${p.replace(/'/g, "'\\''")}'`).join('\n');
             fs.writeFileSync(concatListPath, concatContent);
 

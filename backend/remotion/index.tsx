@@ -6,8 +6,8 @@ export const RemotionRoot = () => {
     <Composition
       id="Captions"
       component={CaptionsComposition}
-      durationInFrames={600} // Will be overridden dynamically
-      fps={60}
+      durationInFrames={300} // Will be overridden dynamically
+      fps={30}
       width={1080}
       height={1920}
       defaultProps={{
@@ -16,13 +16,12 @@ export const RemotionRoot = () => {
         styleOptions: {},
         videoHeight: 1920,
         videoWidth: 1080,
-        durationInFrames: 600,
-        fps: 60
+        durationInFrames: 300
       }}
       calculateMetadata={({ props }) => {
         return {
-          durationInFrames: props.durationInFrames || 600,
-          fps: props.fps || 60,
+          durationInFrames: props.durationInFrames || 300,
+          fps: props.fps || 30,
           width: props.videoWidth || 1080,
           height: props.videoHeight || 1920,
         };

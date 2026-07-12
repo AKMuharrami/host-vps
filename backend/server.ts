@@ -671,7 +671,7 @@ app.post("/api/export-video", (req, res, next) => {
 
             const cpuCount = os.cpus().length;
             // On low resource machines (2 cores), we stick to 1 to prevent OOM or CPU starvation
-            const optimalConcurrency = cpuCount <= 2 ? 1 : Math.min(2, Math.max(1, Math.floor(cpuCount / (activeJobs + 1))));
+            const optimalConcurrency = 1; // Force 1 to prevent OOM on Hostinger
             
             // Limit chunks to avoid overhead and memory issues on hostinger
             const totalDurationInFrames = inputProps.durationInFrames;

@@ -126,8 +126,8 @@ if (isProxyMode) {
   app.use('/api/download-export', proxyToVast);
 }
 
-app.use(express.json({limit: "50mb"}));
-app.use(express.urlencoded({limit: "50mb", extended: true, parameterLimit:50000}));
+app.use(express.json({limit: "500mb"}));
+app.use(express.urlencoded({limit: "500mb", extended: true, parameterLimit:50000}));
 app.use(express.text({ limit: '200mb' }));
 
 app.use("/temp", (req, res, next) => {
@@ -277,7 +277,8 @@ async function ensureFont(fontName: string): Promise<string | null> {
 const exportJobs = new Map<string, { status: string; progress?: number; downloadUrl?: string; error?: string }>();
 
 const jobQueue: (() => Promise<void>)[] = [];
-const MAX_CONCURRENT_JOBS = process.env.MAX_CONCURRENT_JOBS ? parseInt(process.env.MAX_CONCURRENT_JOBS) : 2;
+// Hostinger VPS usually has limited RAM. Defaulting to 1 concurrent job ensures stability.
+const MAX_CONCURRENT_JOBS = process.env.MAX_CONCURRENT_JOBS ? parseInt(process.env.MAX_CONCURRENT_JOBS) : (os.cpus().length <= 2 ? 1 : 2);
 let activeJobs = 0;
 
 // Periodic cleanup for the entire temp directory every 15 mins
@@ -623,15 +624,13 @@ app.post("/api/export-video", (req, res, next) => {
 
             const cpuCount = os.cpus().length;
             // On low resource machines (2 cores), we stick to 1 to prevent OOM or CPU starvation
-            const optimalConcurrency = cpuCount <= 2 ? 1 : Math.min(4, Math.max(1, Math.floor(cpuCount / (activeJobs + 1))));
+            const optimalConcurrency = cpuCount <= 2 ? 1 : Math.min(2, Math.max(1, Math.floor(cpuCount / (activeJobs + 1))));
             
-            // Limit chunks on low resource machines to avoid overhead
+            // Limit chunks to avoid overhead and memory issues on hostinger
             const totalDurationInFrames = inputProps.durationInFrames;
-            const numChunks = cpuCount <= 2 ? 
-                (totalDurationInFrames > 900 ? 2 : 1) : 
-                (totalDurationInFrames > 600 ? 4 : (totalDurationInFrames > 200 ? 2 : 1));
+            const numChunks = 1; // Always use 1 chunk to optimize for low RAM and avoid OOM crashes
 
-            console.log(`[Export] Starting parallel render. CPU Cores: ${cpuCount}, Active Jobs: ${activeJobs}, Chunks: ${numChunks}, Concurrency per chunk: ${optimalConcurrency}`);
+            console.log(`[Export] Starting render. CPU Cores: ${cpuCount}, Active Jobs: ${activeJobs}, Chunks: ${numChunks}, Concurrency: ${optimalConcurrency}`);
             
             const chunkPaths: string[] = [];
             const renderPromises: Promise<void>[] = [];
@@ -651,13 +650,13 @@ app.post("/api/export-video", (req, res, next) => {
                         // port: chunkRenderPort, // Let Remotion pick a free port automatically 
                         codec: 'h264',
                         imageFormat: 'jpeg',
-                        jpegQuality: 100, // Maximizing quality for parallel chunks
+                        jpegQuality: 80, // Lowered from 100 to reduce I/O and memory overhead
                         muted: true,
                         outputLocation: chunkPath,
                         inputProps: { ...inputProps, styleOptions: styleOptionsParsed, fps: sourceFps },
                         frameRange: [startFrame, endFrame],
                         concurrency: optimalConcurrency,
-                        timeoutInMilliseconds: 300000,
+                        timeoutInMilliseconds: 1200000, // 20 minutes timeout to prevent failing on slower VPS
                         chromiumOptions: {
                             ...chromiumOptions,
                             args: [

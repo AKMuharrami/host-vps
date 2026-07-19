@@ -52,11 +52,24 @@ const TITLE_TEMPLATE_STYLES: Record<string, {
     subtitle: React.CSSProperties;
     subtitleContainer?: React.CSSProperties;
 }> = {
+    'glass-dark-ultra': {
+        layoutType: 'no-box',
+        container: { backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.2)', padding: '32px', borderRadius: '40px', textAlign: 'center', maxWidth: '90%', margin: '0 auto', boxShadow: '0 20px 50px rgba(0,0,0,0.5), inset 0 0 20px rgba(255,255,255,0.05)' },
+        title: { fontWeight: 900, color: 'white', letterSpacing: '-0.02em', lineHeight: '1.2', textShadow: '0 10px 20px rgba(0,0,0,0.4)' },
+        subtitle: { fontWeight: 'bold', color: '#22d3ee', letterSpacing: '0.3em', textTransform: 'uppercase', backgroundColor: 'rgba(6, 182, 212, 0.1)', border: '1px solid rgba(6, 182, 212, 0.2)', padding: '8px 20px', borderRadius: '9999px', display: 'inline-block', backdropBlur: 'md', marginTop: '16px' }
+    },
+    'cyberpunk-neon-ultra': {
+        layoutType: 'split-cards',
+        container: { backgroundColor: '#050505', border: '2px solid #22d3ee', padding: '24px', borderRadius: '12px', boxShadow: '0 0 25px rgba(34,211,238,0.4), 0 0 40px rgba(236,72,153,0.3)', textAlign: 'center', maxWidth: '90%', margin: '0 auto' },
+        title: { fontWeight: 900, color: '#22d3ee', textTransform: 'uppercase', letterSpacing: '0.1em', textShadow: '0 0 8px rgba(34,211,238,0.8)', lineHeight: '1.2' },
+        subtitle: { fontWeight: 'bold', color: '#ec4899', letterSpacing: '0.2em', textTransform: 'uppercase', textShadow: '0 0 5px rgba(236,72,153,0.8)' },
+        subtitleContainer: { backgroundColor: 'rgba(0,0,0,0.8)', border: '1px solid rgba(236,72,153,0.3)', padding: '6px 16px', borderRadius: '6px', marginTop: '8px', display: 'inline-block' }
+    },
     'elegant-clean': {
         layoutType: 'no-box',
-        container: { backgroundColor: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(12px)', padding: '20px', borderRadius: '16px', textAlign: 'center', maxWidth: '92%', margin: '0 auto' },
-        title: { fontWeight: 300, color: 'white', letterSpacing: '0.05em', lineHeight: '1.6', textShadow: '0 2px 4px rgba(0,0,0,0.5)', textAlign: 'center' },
-        subtitle: { fontWeight: 'bold', color: '#c7d2fe', letterSpacing: '0.18em', textTransform: 'uppercase', backgroundColor: 'rgba(49, 46, 129, 0.8)', border: '1px solid rgba(99, 102, 241, 0.3)', padding: '4px 14px', borderRadius: '9999px', display: 'inline-block', backdropFilter: 'blur(4px)', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }
+        container: { backgroundColor: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.1)', padding: '24px', borderRadius: '32px', textAlign: 'center', maxWidth: '92%', margin: '0 auto', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' },
+        title: { fontWeight: 500, color: 'white', letterSpacing: '-0.01em', lineHeight: '1.4', textShadow: '0 2px 10px rgba(0,0,0,0.2)' },
+        subtitle: { fontWeight: 'bold', color: '#818cf8', letterSpacing: '0.2em', textTransform: 'uppercase', backgroundColor: 'rgba(79, 70, 229, 0.1)', border: '1px solid rgba(79, 70, 229, 0.2)', padding: '6px 16px', borderRadius: '9999px', display: 'inline-block', backdropBlur: 'md', marginTop: '12px' }
     },
     'viral-pop': {
         layoutType: 'split-cards',
@@ -312,13 +325,24 @@ export const CaptionsComposition = ({
 
     const textShadowValue = shadows.length > 0 ? shadows.join(', ') : 'none';
 
+    const isArabic = isArabicText(activeCaption?.text || '');
+    const direction = isArabic ? 'rtl' : 'ltr';
+
     // Animation Block
     let blockScale = 1;
     let blockTranslateY = 0;
+    let blockOpacityVal = 1;
     
     // Fallback if not specified
     const animType = styleOptions?.animation || 'none';
-    const captionsOnly = styleOptions?.captionsOnly || false;
+    const animationMode = styleOptions?.animationMode || 'none';
+    const isWordAnim = animationMode === 'word' || animationMode === 'highlight';
+    const wordScaleMultiplier = styleOptions?.wordScaleMultiplier ?? 1.15;
+    const inactiveWordOpacity = styleOptions?.inactiveWordOpacity ?? 100;
+    const wordSpeedMultiplier = styleOptions?.wordSpeedMultiplier ?? 1;
+    const useWordHighlightBg = styleOptions?.useWordHighlightBg ?? false;
+    const wordHighlightBgColor = styleOptions?.wordHighlightBgColor ?? '#3e81f6';
+    const wordHighlightColor = styleOptions?.wordHighlightColor ?? '#3e81f6';
 
     if (activeCaption) {
         const startFrame = Math.round(activeCaption.start * fps);
@@ -341,6 +365,8 @@ export const CaptionsComposition = ({
                 [0, 1],
                 [yOffset, 0]
             );
+        } else if (animType === 'fadeIn' || animType === 'typewriter') {
+            blockOpacityVal = interpolate(relativeFrame, [0, 8], [0, 1], { extrapolateRight: 'clamp' });
         }
     }
     
@@ -381,6 +407,7 @@ export const CaptionsComposition = ({
                             fontFamily: displayFont,
                             fontSize: `${scaledFontSize}px`,
                             maxWidth: `${styleOptions?.containerWidth ?? 80}%`,
+                            letterSpacing: isArabic ? 'normal' : undefined,
                             color: styleOptions?.textColor + Math.floor(textOpacity / 100 * 255).toString(16).padStart(2, '0'),
                             backgroundColor: styleOptions?.hasBackground 
                                 ? `${styleOptions?.bgColor}${Math.floor(bgOpacity / 100 * 255).toString(16).padStart(2, '0')}` 
@@ -393,10 +420,11 @@ export const CaptionsComposition = ({
                             lineHeight: '1.2',
                             fontWeight: styleOptions?.fontWeight || 'bold',
                             textShadow: textShadowValue,
-                            direction: 'rtl', // specific to Arabic
-                            transform: `translate(${posX}px, calc(${posY}px + ${blockTranslateY}px)) scale(${blockScale})`
+                            direction: direction as any,
+                            transform: `translate(${posX}px, calc(${posY}px + ${blockTranslateY}px)) scale(${blockScale})`,
+                            opacity: blockOpacityVal
                         }}
-                        dir="rtl"
+                        dir={direction}
                     >
                         <div
                             style={{
@@ -412,7 +440,6 @@ export const CaptionsComposition = ({
                             }}
                         >
                              {activeCaption.text.split(' ').map((word: string, i: number, arr: string[]) => {
-                                const isWordAnim = styleOptions?.animationMode === 'word' || styleOptions?.animationMode === 'highlight';
                                 const duration = activeCaption.end - activeCaption.start;
                                 const wordObj = activeCaption.words?.[i];
                                 
@@ -421,36 +448,31 @@ export const CaptionsComposition = ({
 
                                 const startOffset = actualStart - activeCaption.start;
                                 const endOffset = actualEnd - activeCaption.start;
-                                const speedMultiplier = styleOptions?.wordSpeedMultiplier ?? 1;
+                                const speedMultiplier = wordSpeedMultiplier;
 
-                                const wordStartTime = activeCaption.start + (startOffset / speedMultiplier);
-                                const wordEndTime = activeCaption.start + (endOffset / speedMultiplier);
+                                const SYNC_OFFSET = 0.08;
+                                const wordStartTime = Math.max(0, activeCaption.start + (startOffset / speedMultiplier) - SYNC_OFFSET);
+                                const wordEndTime = Math.max(0, activeCaption.start + (endOffset / speedMultiplier) - SYNC_OFFSET);
                                 
                                 const wordStartFrame = Math.round(wordStartTime * fps);
                                 const wordEndFrame = Math.round(wordEndTime * fps);
                                 
                                 const isHighlighted = isWordAnim && (currentTime >= wordStartTime && currentTime <= wordEndTime);
                                 
-                                const wordHighlightColor = styleOptions?.wordHighlightColor ?? '#3e81f6';
-                                const useWordHighlightBg = styleOptions?.useWordHighlightBg ?? false;
-                                const wordHighlightBgColor = styleOptions?.wordHighlightBgColor ?? '#3e81f6';
-                                const wordScaleMultiplier = styleOptions?.wordScaleMultiplier ?? 1.15;
-                                const inactiveWordOpacity = styleOptions?.inactiveWordOpacity ?? 100;
- 
                                 // Optimization: Only apply heavy transforms during active range
                                 const isActive = frame >= wordStartFrame - 5 && frame <= wordEndFrame + 5;
  
                                 let wordScale = 1;
                                 if (isWordAnim && isActive) {
                                     if (frame >= wordStartFrame && frame < wordEndFrame) {
-                                        wordScale = interpolate(
+                                            wordScale = interpolate(
                                             frame - wordStartFrame,
                                             [0, 3], // small 3 frame pop
                                             [1, wordScaleMultiplier],
                                             { extrapolateRight: 'clamp' }
                                         );
                                     } else if (frame >= wordEndFrame) {
-                                        wordScale = interpolate(
+                                            wordScale = interpolate(
                                             frame - wordEndFrame,
                                             [0, 3], // 3 frame contract
                                             [wordScaleMultiplier, 1],
@@ -459,16 +481,15 @@ export const CaptionsComposition = ({
                                     }
                                 }
                                 
-                                const baseColor = styleOptions?.textColor || 'white';
-                                const activeColor = useWordHighlightBg ? '#ffffff' : wordHighlightColor;
-                                const displayColor = isHighlighted ? activeColor : baseColor;
-                                const displayBg = isHighlighted && useWordHighlightBg ? wordHighlightBgColor : 'transparent';
-                                const displayOpacity = !isWordAnim || isHighlighted ? 1 : inactiveWordOpacity / 100;
-                                const paddingStr = isHighlighted && useWordHighlightBg ? '0.25rem 0.625rem' : '0';
-                                const borderRadiusStr = isHighlighted && useWordHighlightBg ? '0.75rem' : '0';
-                                const marginStr = isHighlighted && useWordHighlightBg ? '0 -1px' : '0';
-                                const borderStr = isHighlighted && useWordHighlightBg ? '1px solid rgba(255,255,255,0.1)' : 'none';
-                                const shadowStr = isHighlighted && useWordHighlightBg ? '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)' : 'none';
+                                let wordOpacity = 1;
+
+                                if (animType === 'typewriter') {
+                                    wordOpacity = interpolate(frame, [wordStartFrame, wordStartFrame + 5], [0, 1], { extrapolateRight: 'clamp' });
+                                } else {
+                                    wordOpacity = (!isWordAnim || isHighlighted) ? 1 : (inactiveWordOpacity / 100);
+                                }
+
+                                const isHighlightedBg = isHighlighted && useWordHighlightBg;
  
                                 return (
                                     <span
@@ -476,16 +497,17 @@ export const CaptionsComposition = ({
                                         style={{
                                             display: 'inline-block',
                                             fontWeight: styleOptions?.fontWeight || 'normal',
-                                            color: displayColor,
-                                            backgroundColor: displayBg,
-                                            opacity: displayOpacity,
-                                            padding: paddingStr,
-                                            borderRadius: borderRadiusStr,
-                                            margin: marginStr,
-                                            border: borderStr,
-                                            boxShadow: shadowStr,
+                                            color: isHighlighted 
+                                                ? (useWordHighlightBg ? '#ffffff' : wordHighlightColor) 
+                                                : undefined,
                                             transform: wordScale !== 1 ? `scale(${wordScale})` : 'none',
-                                            transformOrigin: 'center'
+                                            opacity: wordOpacity,
+                                            transformOrigin: 'center',
+                                            backgroundColor: isHighlightedBg ? wordHighlightBgColor : 'transparent',
+                                            borderRadius: isHighlightedBg ? `${12 * scaleRatio}px` : '0px',
+                                            padding: isHighlightedBg ? `${4 * scaleRatio}px ${10 * scaleRatio}px` : '0px',
+                                            margin: isHighlightedBg ? `0 ${-1 * scaleRatio}px` : '0',
+                                            transition: 'background-color 0.05s, color 0.05s'
                                         }}
                                     >
                                         {word}

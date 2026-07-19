@@ -596,6 +596,11 @@ app.post("/api/export-video", (req, res, next) => {
                 'font-roboto': 'Roboto',
                 'font-amiri': 'Amiri',
                 'font-ibm': 'IBM Plex Sans Arabic',
+                'font-outfit': 'Outfit',
+                'font-inter': 'Inter',
+                'font-space': 'Space Grotesk',
+                'font-playfair': 'Playfair Display',
+                'font-jetbrains': 'JetBrains Mono',
             };
             const actualFontName = FONT_MAP[fontName] || fontName;
             await ensureFont(actualFontName);

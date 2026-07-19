@@ -412,8 +412,8 @@ export const CaptionsComposition = ({
                             backgroundColor: styleOptions?.hasBackground 
                                 ? `${styleOptions?.bgColor}${Math.floor(bgOpacity / 100 * 255).toString(16).padStart(2, '0')}` 
                                 : 'transparent',
-                            borderRadius: '0px',
-                            padding: `${scaledPaddingY}px ${scaledPaddingX}px`,
+                            borderRadius: styleOptions?.hasBackground ? `${Math.round(12 * scaleRatio)}px` : '0px',
+                            padding: styleOptions?.hasBackground ? `${scaledPaddingY}px ${scaledPaddingX}px` : '0px',
                             wordBreak: 'break-word',
                             whiteSpace: 'pre-wrap',
                             borderColor: styleOptions?.hasBackground ? 'rgba(255,255,255,0.1)' : 'transparent',

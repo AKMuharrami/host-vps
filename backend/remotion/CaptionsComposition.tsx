@@ -289,7 +289,7 @@ export const CaptionsComposition = ({
 
     // Apply inline style logic from App.tsx
     const shadowOpacity = styleOptions?.shadowOpacity ?? 80;
-    const bgOpacity = styleOptions?.bgOpacity ?? 0;
+    const bgOpacity = styleOptions?.bgOpacity ?? 85;
     const textOpacity = styleOptions?.textOpacity ?? 100;
     
     // Scale from preview container pixel space to source video pixel space

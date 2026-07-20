@@ -293,14 +293,14 @@ export const CaptionsComposition = ({
     const textOpacity = styleOptions?.textOpacity ?? 100;
     
     // Scale from preview container pixel space to source video pixel space
-    const previewHeight = styleOptions?.previewHeight || 1;
+    const previewHeight = styleOptions?.previewHeight || 600; // Default to 600 if missing
     const videoHeight = propVideoHeight || styleOptions?.videoHeight || 1920;
     const scaleRatio = videoHeight / previewHeight;
     const scaledFontSize = Math.floor((styleOptions?.fontSize ?? 40) * scaleRatio);
     const scaledPaddingY = Math.floor(8 * scaleRatio);
     const scaledPaddingX = Math.floor(10 * scaleRatio);
-    const scaledStroke = Math.floor((styleOptions?.strokeSize ?? 1) * scaleRatio);
-    const scaledShadow = Math.floor((styleOptions?.shadowSize ?? 2) * scaleRatio);
+    const scaledStroke = (styleOptions?.strokeSize ?? 1) * scaleRatio;
+    const scaledShadow = (styleOptions?.shadowSize ?? 2) * scaleRatio;
     
     // Convert hex+opacity down if we want, or just rely on CSS
     const hasShadow = styleOptions?.hasShadow;
@@ -310,11 +310,11 @@ export const CaptionsComposition = ({
 
     const shadows = [];
     if (styleOptions?.hasStroke && scaledStroke > 0) {
-        const steps = 12;
+        const steps = 16; // Increased steps for smoother stroke on render
         for (let i = 0; i < steps; i++) {
             const angle = (i * 2 * Math.PI) / steps;
-            const dx = (Math.cos(angle) * scaledStroke).toFixed(1);
-            const dy = (Math.sin(angle) * scaledStroke).toFixed(1);
+            const dx = (Math.cos(angle) * scaledStroke).toFixed(2);
+            const dy = (Math.sin(angle) * scaledStroke).toFixed(2);
             shadows.push(`${dx}px ${dy}px 0px ${styleOptions.strokeColor}`);
         }
     }
@@ -332,6 +332,7 @@ export const CaptionsComposition = ({
     let blockScale = 1;
     let blockTranslateY = 0;
     let blockOpacityVal = 1;
+    let blockBlur = 0;
     
     // Fallback if not specified
     const animType = styleOptions?.animation || 'none';
@@ -365,13 +366,66 @@ export const CaptionsComposition = ({
                 [0, 1],
                 [yOffset, 0]
             );
-        } else if (animType === 'fadeIn' || animType === 'typewriter') {
             blockOpacityVal = interpolate(relativeFrame, [0, 8], [0, 1], { extrapolateRight: 'clamp' });
+        } else if (animType === 'fadeIn' || animType === 'typewriter') {
+            blockOpacityVal = interpolate(relativeFrame, [0, 10], [0, 1], { extrapolateRight: 'clamp' });
+        } else if (animType === 'blurReveal') {
+            blockOpacityVal = interpolate(relativeFrame, [0, 10], [0, 1], { extrapolateRight: 'clamp' });
+            blockBlur = interpolate(relativeFrame, [0, 10], [10, 0], { extrapolateRight: 'clamp' });
+            blockScale = interpolate(relativeFrame, [0, 10], [0.95, 1], { extrapolateRight: 'clamp' });
+        } else if (animType === 'zoomIn') {
+            blockScale = spring({
+                fps,
+                frame: relativeFrame,
+                config: { damping: 15, stiffness: 200 },
+                from: 0.5,
+                to: 1
+            });
+            blockOpacityVal = interpolate(relativeFrame, [0, 10], [0, 1], { extrapolateRight: 'clamp' });
+        } else if (animType === 'bounce') {
+            blockScale = spring({
+                fps,
+                frame: relativeFrame,
+                config: { damping: 8, stiffness: 200 },
+                from: 0.5,
+                to: 1
+            });
+        } else if (animType === 'slideLeft') {
+            const xOffset = 50 * scaleRatio;
+            blockTranslateY = 0; // x animation
+            blockOpacityVal = interpolate(relativeFrame, [0, 10], [0, 1], { extrapolateRight: 'clamp' });
+            // We use transform directly later, but let's use a temp var for X
+        } else if (animType === 'glitch') {
+            blockOpacityVal = interpolate(relativeFrame, [0, 5], [0, 1]);
+            // Simulated jitter
+            const jitter = Math.sin(frame) * 2 * scaleRatio;
+            blockTranslateY = jitter;
         }
     }
     
     const posX = (styleOptions?.captionPosition?.x ?? 0) * scaleRatio;
     const posY = (styleOptions?.captionPosition?.y ?? 0) * scaleRatio;
+
+    // Additional translation logic for side slides
+    let animTranslateX = 0;
+    if (activeCaption) {
+        const startFrame = Math.round(activeCaption.start * fps);
+        const relativeFrame = frame - startFrame;
+        if (animType === 'slideLeft') {
+            animTranslateX = interpolate(
+                spring({ fps, frame: relativeFrame, config: { damping: 15, stiffness: 150 } }),
+                [0, 1],
+                [50 * scaleRatio, 0]
+            );
+        } else if (animType === 'slideRight') {
+            animTranslateX = interpolate(
+                spring({ fps, frame: relativeFrame, config: { damping: 15, stiffness: 150 } }),
+                [0, 1],
+                [-50 * scaleRatio, 0]
+            );
+            blockOpacityVal = interpolate(relativeFrame, [0, 10], [0, 1], { extrapolateRight: 'clamp' });
+        }
+    }
     
     // Check if the cover title is currently active
     const showCover = styleOptions?.showCoverTitle && currentTime <= (styleOptions?.coverDuration ?? 2.5);
@@ -421,8 +475,9 @@ export const CaptionsComposition = ({
                             fontWeight: styleOptions?.fontWeight || 'bold',
                             textShadow: textShadowValue,
                             direction: direction as any,
-                            transform: `translate(${posX}px, calc(${posY}px + ${blockTranslateY}px)) scale(${blockScale})`,
-                            opacity: blockOpacityVal
+                            transform: `translate(calc(${posX}px + ${animTranslateX}px), calc(${posY}px + ${blockTranslateY}px)) scale(${blockScale})`,
+                            opacity: blockOpacityVal,
+                            filter: blockBlur > 0 ? `blur(${blockBlur}px)` : 'none'
                         }}
                         dir={direction}
                     >

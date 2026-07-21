@@ -483,7 +483,7 @@ app.post("/api/export-video", (req, res, next) => {
         if (videoSource.startsWith('http')) {
            console.log(`[Export Background] Downloading video from URL: ${videoSource}`);
            const controller = new AbortController();
-           const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 mins timeout
+           const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 mins timeout
            try {
                const dlRes = await fetch(videoSource, { signal: controller.signal });
                if (!dlRes.ok) throw new Error('Failed to download video from URL');

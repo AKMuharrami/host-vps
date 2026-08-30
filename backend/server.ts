@@ -246,6 +246,7 @@ const FONT_URLS: Record<string, string> = {
   'Tajawal': 'https://raw.githubusercontent.com/google/fonts/main/ofl/tajawal/Tajawal-Bold.ttf',
   'Amiri': 'https://raw.githubusercontent.com/google/fonts/main/ofl/amiri/Amiri-Bold.ttf',
   'IBM Plex Sans Arabic': 'https://raw.githubusercontent.com/google/fonts/main/ofl/ibmplexsansarabic/IBMPlexSansArabic-Bold.ttf',
+  'Changa': 'https://raw.githubusercontent.com/google/fonts/main/ofl/changa/Changa%5Bwght%5D.ttf',
   'DejaVu Sans': 'https://raw.githubusercontent.com/google/fonts/main/ofl/roboto/Roboto%5Bwdth%2Cwght%5D.ttf',
   'Roboto': 'https://raw.githubusercontent.com/google/fonts/main/ofl/roboto/Roboto%5Bwdth%2Cwght%5D.ttf',
   'Noto Sans Arabic': 'https://raw.githubusercontent.com/google/fonts/main/ofl/notosansarabic/NotoSansArabic%5Bwdth%2Cwght%5D.ttf',
@@ -305,8 +306,8 @@ setInterval(() => {
       const filePath = path.join(tempDir, file);
       try {
         const stats = fs.statSync(filePath);
-        // Delete files older than 10 minutes
-        if (now - stats.mtimeMs > 10 * 60 * 1000) {
+        // Delete files older than 45 minutes
+        if (now - stats.mtimeMs > 45 * 60 * 1000) {
           if (stats.isDirectory()) {
              if (file.startsWith('remotion-')) {
                 fs.rmSync(filePath, { recursive: true, force: true });
@@ -601,6 +602,7 @@ app.post("/api/export-video", (req, res, next) => {
                 'font-roboto': 'Roboto',
                 'font-amiri': 'Amiri',
                 'font-ibm': 'IBM Plex Sans Arabic',
+                'font-changa': 'Changa',
                 'font-outfit': 'Outfit',
                 'font-inter': 'Inter',
                 'font-space': 'Space Grotesk',
@@ -671,7 +673,7 @@ app.post("/api/export-video", (req, res, next) => {
                 id: 'Captions',
                 inputProps,
                 chromiumOptions,
-                timeoutInMilliseconds: 120000, // 2 minutes to select composition
+                timeoutInMilliseconds: 240000, // 4 minutes to select composition
                 onBrowserLog: (log) => {
                     if (log.type === 'error' || log.type === 'warning') {
                         console.log(`[Browser] ${log.type}: ${log.text}`);

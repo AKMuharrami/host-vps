@@ -132,9 +132,9 @@ if (isProxyMode) {
   app.use('/api/download-export', proxyToVast);
 }
 
-app.use(express.json({limit: "500mb"}));
-app.use(express.urlencoded({limit: "500mb", extended: true, parameterLimit:50000}));
-app.use(express.text({ limit: '200mb' }));
+app.use(express.json({limit: "1000mb"}));
+app.use(express.urlencoded({limit: "1000mb", extended: true, parameterLimit:100000}));
+app.use(express.text({ limit: '1000mb' }));
 
 app.use("/temp", (req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -236,7 +236,7 @@ if (!fs.existsSync(uploadDir)) {
 }
 const upload = multer({ 
   dest: uploadDir,
-  limits: { fileSize: 500 * 1024 * 1024 } // 500MB max limit to cover raw 4K mobile video inputs
+  limits: { fileSize: 1000 * 1024 * 1024 } // 1000MB (1GB) max limit to cover raw 4K mobile video inputs
 });
 
 // Font Manager

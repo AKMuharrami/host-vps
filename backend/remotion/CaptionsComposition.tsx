@@ -219,12 +219,6 @@ export const CaptionsComposition = ({
         'font-roboto': 'Roboto',
         'font-amiri': 'Amiri',
         'font-ibm': 'IBM Plex Sans Arabic',
-        'font-changa': 'Changa',
-        'font-outfit': 'Outfit',
-        'font-inter': 'Inter',
-        'font-space': 'Space Grotesk',
-        'font-playfair': 'Playfair Display',
-        'font-jetbrains': 'JetBrains Mono',
     };
     
     const baseFont = FONT_MAP[styleOptions.fontFamily] || styleOptions.fontFamily || 'Janna LT';
